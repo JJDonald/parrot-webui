@@ -1,0 +1,27 @@
+/**
+ * 管理任务页私有样式。
+ * 只使用 theme.scss 的 CSS 变量，不硬编码颜色、圆角与字号。
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--keeper-section-gap);
+  max-width: var(--keeper-page-max-width);
+}
+
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--keeper-section-gap);
+}
+
+.noteList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: var(--keeper-body-font-size);
+}

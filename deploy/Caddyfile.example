@@ -1,0 +1,75 @@
+# ============================================================================
+# Parrot 独立 WebUI：Caddy 入口的「新增增量片段」（与 deploy/nginx-webui.conf 等价）
+# ============================================================================
+#
+# 用途：用户现有入口是 Caddy 时，在**已有的** parrot.example.com site 块里只新增 /webui/ 分流。
+#
+# 硬约束：
+#   - 只加下面这段，不改动原有的 /、/v1、/api/management/v1、/mcp 等路由；
+#     若原配置用 handle_path 处理别的路径，保持原样，不要动。
+#   - 必须保留 /webui/ 前缀：Caddy 的 reverse_proxy **不会**剥前缀，请用 handle；
+#     千万不要写 handle_path /webui/*（那是剥前缀写法）或 rewrite/uri strip_prefix，
+#     否则 BFF 路径与 Cookie Path 全部错位。
+#   - 不要新开端口、新 server_name 或新域名；3000 只作为同机回环目标。
+#
+# 校验与平滑生效（Caddyfile 路径按现场实际替换）：
+#   caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+#   systemctl reload caddy        # 或 caddy reload --config /etc/caddy/Caddyfile
+#
+# 回滚：删除下面新增的 4 段 → 重新 validate → reload。
+#
+# 若 Caddy 前面还有 CDN 或第二层代理：
+#   需要在 Caddy 中显式配置 trusted_proxies（只列真实上游代理地址），
+#   否则 Caddy 会把对端当作客户端；同时上游必须自己覆盖/清除客户端伪造的 X-Forwarded-*。
+#   Caddy 默认不信任客户端传入的 X-Forwarded-*，会自行设置这些头（与 Nginx 片段做法一致）。
+#
+# WebUI 侧 WEBUI_TRUST_PROXY 必须填 Caddy 实际发起连接的来源地址/CIDR（见 .env.example）。
+# ============================================================================
+
+parrot.example.com {
+	# 1) /webui → /webui/（保留尾斜杠）
+	#    Caddy 默认指令顺序中 redir 先于 respond / reverse_proxy，这里的顺序是安全的。
+	redir /webui /webui/ 308
+
+	# 2) 容器健康检查不对外（对应 BFF 的 /webui/health/live、/webui/health/ready）
+	@webuiHealth path /webui/health /webui/health/*
+	respond @webuiHealth 404
+
+	# 3) 其余 /webui/ 保留前缀转发到独立 WebUI 容器（仅宿主回环 127.0.0.1:3000）
+	handle /webui/* {
+		reverse_proxy 127.0.0.1:3000 {
+			# 默认即原样传递 Host；这里显式写出，避免被上游约定误改
+			header_up Host {host}
+			# X-Forwarded-For / X-Forwarded-Proto / X-Forwarded-Host 由 Caddy 自行设置，
+			# 不沿用客户端伪造值。
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 120s
+			}
+		}
+	}
+
+	# 4) 原有路由保持原样（示例占位，实际沿用用户现有配置，不要用本文件覆盖它）：
+	# handle /v1/* {
+	# 	reverse_proxy <原 Parrot 上游>
+	# }
+	# handle /api/management/v1/* {
+	# 	reverse_proxy <原 Parrot 上游>
+	# }
+	# handle /mcp/* {
+	# 	reverse_proxy <原 Parrot 上游>
+	# }
+	# handle {
+	# 	reverse_proxy <原 Parrot 上游>
+	# }
+}
+
+# ============================================================================
+# 生效后验证（域名替换为真实值）：
+#   curl -sSI https://parrot.example.com/webui      | head -1   # 期望 308
+#   curl -sSI https://parrot.example.com/webui/     | head -1   # 期望 200
+#   curl -sS  https://parrot.example.com/webui/health/live       # 期望 404
+#   curl -sSI https://parrot.example.com/v1/models  | head -1   # 原推理入口回归
+#   curl -sSI https://parrot.example.com/api/management/v1/meta | head -1  # 原管理 API 回归
+# 公网端口拒绝验证：从另一台公网机器访问 http://<宿主公网IP>:3000/webui/health/live 必须失败。
+# ============================================================================

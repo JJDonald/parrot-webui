@@ -1,0 +1,186 @@
+/**
+ * 总览页私有样式。
+ * 只使用 theme.scss 的 CSS 变量，不硬编码颜色、圆角与字号。
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--keeper-section-gap);
+  max-width: var(--keeper-page-max-width);
+}
+
+.headActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.refreshRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--text-secondary);
+  font-size: var(--keeper-body-font-size);
+}
+
+.refreshRow strong {
+  color: var(--text-primary);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.scroll {
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
+}
+
+.table {
+  min-width: 980px;
+}
+
+.colsChannels {
+  grid-template-columns: minmax(160px, 1.6fr) 110px 100px 120px minmax(160px, 1.6fr);
+}
+
+.colsCooldowns {
+  grid-template-columns: minmax(140px, 1.2fr) minmax(140px, 1.2fr) 90px 100px 150px minmax(160px, 1.4fr);
+}
+
+.colsJobs {
+  grid-template-columns: minmax(180px, 1.6fr) 100px 110px 150px 150px minmax(160px, 1.4fr);
+}
+
+.colsMetrics {
+  grid-template-columns: minmax(150px, 1.4fr) 90px 90px 90px 110px 110px 110px 130px;
+}
+
+.colsCalls {
+  grid-template-columns: 150px minmax(140px, 1.2fr) minmax(140px, 1.2fr) 130px 110px;
+}
+
+.colsQuota {
+  grid-template-columns: minmax(160px, 1.4fr) 140px 140px 140px;
+}
+
+.note {
+  color: var(--text-tertiary);
+  font-size: var(--keeper-card-subtitle-size);
+}
+
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--keeper-section-gap);
+}
+
+.page > section:first-child {
+  background:
+    radial-gradient(ellipse at 92% 0%, color-mix(in srgb, var(--primary-color) 9%, transparent), transparent 42%),
+    var(--bg-primary);
+}
+
+.page > section:first-child :global(.keeper-card__title) {
+  font-size: clamp(22px, 2vw, 28px);
+  letter-spacing: -0.025em;
+}
+
+.page > section:first-child :global(.keeper-card__subtitle) {
+  max-width: 760px;
+  line-height: 1.7;
+}
+
+.refreshRow {
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
+}
+
+.controls {
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+}
+
+.controls :global(.field) {
+  min-width: min(220px, 100%);
+}
+
+.controls :global(.field__label) {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.scroll {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-primary);
+}
+
+.table {
+  border: 0;
+  border-radius: var(--radius-lg);
+}
+
+.table :global(.keeper-table__header) {
+  min-height: 42px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.table :global(.keeper-table__row) {
+  min-height: 46px;
+  transition: background-color 120ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.table :global(.keeper-table__row:hover) {
+  background: var(--bg-secondary);
+}
+
+.note {
+  line-height: 1.65;
+}
+
+@media (max-width: 768px) {
+  .page > section:first-child :global(.keeper-card__title) {
+    font-size: 22px;
+  }
+
+  .page > section:first-child :global(.keeper-card__header) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .refreshRow {
+    align-items: flex-start;
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .colsChannels,
+  .colsCooldowns,
+  .colsJobs,
+  .colsMetrics,
+  .colsCalls,
+  .colsQuota {
+    min-width: 760px;
+  }
+}

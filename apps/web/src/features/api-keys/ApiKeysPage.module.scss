@@ -1,0 +1,50 @@
+/**
+ * 下游 API Key 页面私有样式：只使用 theme.scss 的 CSS 变量。
+ */
+
+.nameButton {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nameButton:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+.limiterUnlimited {
+  color: var(--text-secondary);
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.numberInput {
+  width: 100%;
+}
+
+.actionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+}
+
+@media (max-width: 768px) {
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,103 @@
+# Parrot 独立 WebUI：独立 Compose 项目（方案 A：现有反向代理运行在宿主机）
+#
+# 这个文件只定义 WebUI 自己，不定义、不重建原 Parrot 服务：
+#   - 不挂载 Docker socket，不挂载原 Parrot 数据目录或配置；
+#   - 默认只把端口发布到宿主回环 127.0.0.1:3000，公网无法直连；
+#   - 正式入口只有 https://原Parrot域名/webui/（由宿主反向代理分流，见 deploy/nginx-webui.conf）。
+#
+# 使用前：
+#   1) cp .env.example .env 并填写真实值（.env 不提交、不打进镜像）；
+#   2) docker compose config   # 检查合并后的配置，确认没有 0.0.0.0/[::] 发布
+#   3) docker compose up -d --build
+#
+# 方案 B（入口代理也是容器）改法，二选一，改完必须重新执行 docker compose config 确认 ports 已消失：
+#   - 删除本文件的 ports: 段，改为：
+#       expose:
+#         - "3000"
+#       networks:
+#         - existing-ingress
+#     并在文件末尾增加：
+#       networks:
+#         existing-ingress:
+#           external: true
+#           name: "实际已存在的入口Docker网络名"
+#   - 入口代理容器与 WebUI 在同一网络，通过服务名访问 WebUI 的 3000：
+#       容器内/入口代理里 proxy_pass http://webui:3000;（仍不加 URI 尾斜杠，保留 /webui/ 前缀）
+#   - expose 不发布宿主端口，也不是防火墙；该网络上其他容器的信任边界需要单独记录。
+#   - 不要用 override 文件"省略" ports 就以为端口不再发布，必须看合并后的 docker compose config。
+#
+# 方案 B 下 WebUI 到本机 Parrot 的连接：优先复用原 Parrot 已有的用户自定义网络 + 服务别名，
+# 或宿主网关可达的已发布端口；container 内的 localhost 不是宿主。
+
+name: parrot-webui
+
+services:
+  webui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: parrot-webui:local
+    restart: unless-stopped
+    init: true
+    # 镜像本身已 USER node；这里显式声明，避免叠加部署时被改成 root
+    user: "node"
+
+    # 仅宿主回环发布：这是同机反向代理的内部目标，不是用户访问网址。
+    # 禁止改成 "3000:3000"、"0.0.0.0:3000:3000" 或 "[::]:3000:3000"。
+    ports:
+      - "127.0.0.1:3000:3000"
+
+    # 容器到本机 Parrot 的默认通道（Linux 下访问宿主已发布端口）。
+    # 注意：host-gateway 不保证能访问宿主上只绑定 127.0.0.1 的原端口，需现场实测（见 docs/deployment.md）。
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    environment:
+      NODE_ENV: "production"
+      PORT: "3000"
+      # 容器内监听地址：只服务同机反向代理，不做公网暴露
+      WEBUI_BIND_HOST: "0.0.0.0"
+      # 首版固定值：前端 base、BFF 路径、Cookie Path 必须一致，不支持随意修改
+      WEBUI_BASE_PATH: "/webui/"
+      WEBUI_STATIC_DIR: "/app/apps/web/dist"
+
+      # 必填：本机原 Parrot 的内部 origin（不含 /api/management/v1，不指向 /webui/）
+      PARROT_BASE_URL: "${PARROT_BASE_URL:?set local Parrot origin, e.g. http://host.docker.internal:22122}"
+      # 必填：现有 Parrot 的 HTTPS origin（不含路径），浏览器唯一合法来源
+      WEBUI_PUBLIC_ORIGIN: "${WEBUI_PUBLIC_ORIGIN:?set existing Parrot https origin}"
+      # 必填（正式模式）：实际入口反向代理地址/CIDR，禁止 * 或全信任
+      WEBUI_TRUST_PROXY: "${WEBUI_TRUST_PROXY:?set actual ingress proxy addresses/CIDRs}"
+      WEBUI_INSTANCE_NAME: "${WEBUI_INSTANCE_NAME:-Parrot}"
+
+      # 可选项（默认值见 apps/bff/src/config.ts，需要时在 .env 中覆盖）
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      WEBUI_SESSION_IDLE_SECONDS: "${WEBUI_SESSION_IDLE_SECONDS:-1800}"
+      WEBUI_SESSION_MAX_SECONDS: "${WEBUI_SESSION_MAX_SECONDS:-28800}"
+      PARROT_CONNECT_TIMEOUT_MS: "${PARROT_CONNECT_TIMEOUT_MS:-5000}"
+      PARROT_REQUEST_TIMEOUT_MS: "${PARROT_REQUEST_TIMEOUT_MS:-30000}"
+      # 默认 0：诊断接口不对外显示原始上游地址
+      WEBUI_DIAGNOSTICS_EXPOSE_UPSTREAM: "${WEBUI_DIAGNOSTICS_EXPOSE_UPSTREAM:-0}"
+      # 这里绝不能出现共享管理密钥：管理主密钥只在浏览器登录请求里出现，BFF 不落盘、不读环境变量。
+
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+    healthcheck:
+      # 用 live 而不是 ready：上游短暂不可达不应该导致容器重启循环
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/webui/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+    stop_grace_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,158 @@
+/**
+ * 「第三方 API 渠道」页面私有样式。
+ *
+ * 只使用 styles/theme.scss 的 CSS 变量；结构类（.stack/.row/.field/.input/.pill/.notice-box…）
+ * 复用 styles/global.scss，避免重复定义视觉语言。
+ */
+
+.noticeArea {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.clickableRow {
+  cursor: pointer;
+}
+
+.nameCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nameCell__title {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.urlCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  max-width: 320px;
+}
+
+.urlCell__hint {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sectionHint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.fieldWide {
+  grid-column: 1 / -1;
+}
+
+.fieldError {
+  font-size: 11px;
+  color: var(--danger-color);
+}
+
+.formActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.modelsTextarea {
+  min-height: 96px;
+  font-family: var(--keeper-font-mono);
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.secretNote {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-primary);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.metricItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+
+.metricItem__label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.metricItem__value {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.metricItem__hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.monoCell {
+  font-family: var(--keeper-font-mono);
+  word-break: break-all;
+}
+
+@media (max-width: 768px) {
+  .urlCell {
+    max-width: 220px;
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@parrot-webui/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./routes": {
+      "types": "./dist/generated/management-routes.d.ts",
+      "default": "./dist/generated/management-routes.js"
+    },
+    "./upstream": {
+      "types": "./generated/upstream-mvp.d.ts"
+    },
+    "./generated/upstream-mvp": {
+      "types": "./generated/upstream-mvp.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "node -e \"process.exit(0)\"",
+    "test": "node -e \"process.exit(0)\""
+  }
+}

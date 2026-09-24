@@ -1,0 +1,28 @@
+/**
+ * 模型中心私有样式：只使用 theme.scss 的 CSS 变量，不硬编码颜色。
+ */
+
+.batchGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.noticeSuccess {
+  border-color: var(--success-border);
+  background: var(--success-soft);
+  color: var(--text-primary);
+}
+
+.noticeInfo {
+  border-color: var(--border-primary);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .batchGrid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,140 @@
+/**
+ * 请求日志页私有样式（features/logs）。
+ *
+ * 只使用 styles/theme.scss 暴露的 CSS 变量，不硬编码颜色/字号/圆角；
+ * 通用形状与卡片语义尽量复用 global.scss 的 .keeper-card / .field / .notice-box 等类。
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--keeper-section-gap);
+  min-width: 0;
+}
+
+.table {
+  min-width: 0;
+}
+
+.tableRow {
+  cursor: pointer;
+}
+
+.tableRow:hover > td {
+  background: var(--bg-tertiary) !important;
+}
+
+.tableRow:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: -2px;
+}
+
+.timeCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.modelCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  max-width: 220px;
+}
+
+.errorCell {
+  display: block;
+  max-width: 240px;
+  overflow: hidden;
+  color: var(--danger-color);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.filterMeta {
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.truncation {
+  border-left: 3px solid var(--warning-color);
+}
+
+.bodyToolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  align-items: end;
+  gap: 12px;
+}
+
+.itemHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.itemHeader__title {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.itemHeader__summary {
+  max-width: 320px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  /* 字号交给全局 .text-sm，私有样式里不硬编码字号 */
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--text-secondary);
+}
+
+.subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.drawerStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--keeper-section-gap);
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .modelCell,
+  .errorCell,
+  .itemHeader__summary {
+    max-width: 100%;
+  }
+}
