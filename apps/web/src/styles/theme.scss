@@ -1,0 +1,187 @@
+/**
+ * 主题与设计令牌。
+ *
+ * 令牌取值来自参考项目 cpa-usage-keeper（Willxup/cpa-usage-keeper，MIT）的
+ * src/styles/themes.scss + src/styles/variables.scss，并补充了 Parrot 管理台需要的组件令牌。
+ * 三套主题：默认“纸感”米色(:root)、纯白([data-theme='white'])、暖炭黑([data-theme='dark'])。
+ *
+ * 约定：页面样式只使用 var(--...) 令牌，不硬编码颜色；Ant Design 的主题在运行时读取这些
+ * CSS 变量生成（见 src/app/antdTheme.ts），因此这里是唯一事实来源。
+ */
+
+:root {
+  /* ---------- 表面 ---------- */
+  --bg-secondary: #faf9f5; /* 页面背景 */
+  --bg-primary: #f0eee8; /* 卡片/面板 */
+  --bg-tertiary: #e9e6df; /* hover / active */
+  --bg-hover: var(--bg-tertiary);
+  --bg-quinary: #f6f4ee;
+  --bg-error-light: rgba(198, 87, 70, 0.1);
+  --floating-surface: #fffdf9;
+  --floating-border: #d8d3ca;
+  --floating-shadow: 0 12px 26px rgba(0, 0, 0, 0.14);
+
+  /* ---------- 文本 ---------- */
+  --text-primary: #2d2a26;
+  --text-secondary: #6d6760;
+  --text-tertiary: #a29c95;
+  --text-quaternary: #c0bab3;
+  --text-muted: var(--text-tertiary);
+
+  /* ---------- 描边 ---------- */
+  --border-color: #e3e1db;
+  --border-primary: #d5d2cb;
+  --border-hover: #cecac4;
+  --border-secondary: var(--border-color);
+
+  /* ---------- 品牌与语义色 ---------- */
+  --primary-color: #8b8680;
+  --primary-hover: #7f7a74;
+  --primary-active: #726d67;
+  --primary-contrast: #ffffff;
+  --primary-soft: rgba(139, 134, 128, 0.18);
+  --primary-ring: rgba(139, 134, 128, 0.18);
+  --success-color: #10b981;
+  --success-soft: rgba(16, 185, 129, 0.08);
+  --success-border: rgba(16, 185, 129, 0.35);
+  --success-badge-bg: #d1fae5;
+  --success-badge-text: #065f46;
+  --success-badge-border: #6ee7b7;
+  --quota-medium-color: #e0aa14;
+  --warning-color: #c65746; /* 参考项目的 warning 是陶土红，不是琥珀色 */
+  --warning-bg: rgba(198, 87, 70, 0.12);
+  --warning-border: rgba(198, 87, 70, 0.35);
+  --warning-text: var(--warning-color);
+  --failure-badge-bg: rgba(198, 87, 70, 0.14);
+  --failure-badge-text: #8a3a30;
+  --failure-badge-border: rgba(198, 87, 70, 0.35);
+  --error-color: #c65746;
+  --danger-color: var(--error-color);
+  --info-color: var(--primary-color);
+  --count-badge-bg: rgba(139, 134, 128, 0.18);
+  --count-badge-text: var(--primary-active);
+  --accent-tertiary: var(--bg-tertiary);
+
+  /* ---------- 阴影 ---------- */
+  --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.08);
+  --shadow-lg: 0 10px 18px -3px rgb(0 0 0 / 0.1);
+  --shadow-dock: 0 8px 24px rgb(33 40 57 / 13%), 0 1px 3px rgb(33 40 57 / 7%);
+  --shadow-topbar: 0 18px 48px rgba(0, 0, 0, 0.08);
+
+  /* ---------- 玻璃质感 ---------- */
+  --glass-blur: 12px;
+  --glass-backdrop-filter: blur(12px);
+  --glass-bg: color-mix(in srgb, var(--bg-primary) 82%, transparent);
+  --glass-bg-secondary: color-mix(in srgb, var(--bg-secondary) 82%, transparent);
+  --glass-border: color-mix(in srgb, var(--border-color) 60%, transparent);
+  --glass-topbar-bg: color-mix(in srgb, var(--bg-primary) 84%, transparent);
+
+  /* ---------- 菜单 ---------- */
+  --keeper-menu-hover-bg: color-mix(in srgb, var(--bg-hover) 60%, transparent);
+  --keeper-menu-selected-bg: var(--bg-hover);
+
+  /* ---------- 形状与尺寸 ---------- */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+  --keeper-card-radius: 24px;
+  --keeper-login-card-radius: 28px;
+  --keeper-card-padding: 20px;
+  --keeper-control-height-sm: 32px;
+  --keeper-control-height-md: 36px;
+  --keeper-control-height-lg: 42px;
+  --keeper-control-font-size: 12px;
+  --keeper-body-font-size: 12px;
+  --keeper-card-title-size: 18px;
+  --keeper-card-title-weight: 700;
+  --keeper-card-subtitle-size: 12px;
+  --keeper-section-gap: 16px;
+  --keeper-page-max-width: clamp(1245px, 86vw, 1600px);
+  --keeper-page-padding-top: 28px;
+  --keeper-page-padding-x: 20px;
+  --keeper-page-padding-bottom: 48px;
+  --keeper-page-frame-gap: 18px;
+  --keeper-sidebar-width: 240px;
+  --keeper-sidebar-collapsed-width: 60px;
+  --keeper-font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+    'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --keeper-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+
+  color-scheme: light;
+}
+
+[data-theme='white'] {
+  --bg-secondary: #ffffff;
+  --bg-primary: #ffffff;
+  --bg-tertiary: #f6f6f6;
+  --bg-hover: var(--bg-tertiary);
+  --bg-quinary: #ffffff;
+  --bg-error-light: rgba(198, 87, 70, 0.08);
+  --floating-surface: #ffffff;
+  --floating-border: #d9d9d9;
+  --floating-shadow: 0 12px 26px rgba(0, 0, 0, 0.12);
+  --border-color: #e5e5e5;
+  --border-primary: #d9d9d9;
+  --border-hover: #cccccc;
+  --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 10px 18px -3px rgb(0 0 0 / 0.08);
+  --keeper-menu-selected-bg: color-mix(in srgb, var(--text-primary) 8%, var(--bg-primary));
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --bg-secondary: #151412;
+  --bg-primary: #1d1b18;
+  --bg-tertiary: #262320;
+  --bg-hover: #2e2a26;
+  --bg-quinary: #191714;
+  --bg-error-light: rgba(198, 87, 70, 0.18);
+  --floating-surface: #2a2723;
+  --floating-border: #4a443d;
+  --floating-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
+
+  --text-primary: #f6f4f1;
+  --text-secondary: #c9c3bb;
+  --text-tertiary: #9c958d;
+  --text-quaternary: #6f6962;
+
+  --border-color: #3a3530;
+  --border-primary: #4a453f;
+  --border-hover: #5a544d;
+
+  --primary-color: #8b8680;
+  --primary-hover: #9a948e;
+  --primary-active: #a6a099;
+  --primary-soft: rgba(139, 134, 128, 0.28);
+  --success-color: #10b981;
+  --success-soft: rgba(16, 185, 129, 0.14);
+  --success-border: rgba(16, 185, 129, 0.4);
+  --quota-medium-color: #ffd862;
+  --warning-bg: rgba(198, 87, 70, 0.22);
+  --warning-border: rgba(198, 87, 70, 0.45);
+  --warning-text: #f1b0a6;
+  --success-badge-bg: rgba(6, 78, 59, 0.3);
+  --success-badge-text: #6ee7b7;
+  --success-badge-border: #059669;
+  --failure-badge-bg: rgba(198, 87, 70, 0.24);
+  --failure-badge-text: #f1b0a6;
+  --failure-badge-border: rgba(198, 87, 70, 0.5);
+  --count-badge-bg: rgba(139, 134, 128, 0.28);
+  --count-badge-text: #c9c3bb;
+
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3);
+  --shadow-dock: 0 8px 24px rgb(0 0 0 / 35%), 0 1px 3px rgb(0 0 0 / 25%);
+  --shadow-topbar: 0 18px 48px rgba(0, 0, 0, 0.4);
+  --glass-border: color-mix(in srgb, var(--border-color) 55%, transparent);
+  color-scheme: dark;
+}
+
+@media (max-width: 768px), (prefers-reduced-motion: reduce), (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-backdrop-filter: none;
+    --glass-filter: none;
+  }
+}

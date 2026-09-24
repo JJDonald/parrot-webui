@@ -1,0 +1,412 @@
+/**
+ * OAuth 账号页私有样式。只使用 styles/theme.scss 的 CSS 变量，不硬编码颜色/字号/圆角。
+ * 视觉参考 cpa-usage-keeper：暖色纸感、24px 卡片、胶囊徽标、12px 正文。
+ */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--keeper-section-gap);
+  min-width: 0;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.cardHeaderText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toolbarEnd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.filterField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 150px;
+}
+
+.filterLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.tableWrap {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background-color: var(--bg-primary);
+}
+
+.accountCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.accountName {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.accountIdentity {
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ------------------------------------------------------- 额度 / 用量（未知即未知） */
+
+.usageList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.usageRow {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(160px, 2fr) minmax(120px, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.usageName {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usageTrack {
+  position: relative;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--bg-tertiary);
+  overflow: hidden;
+}
+
+.usageFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background-color: var(--success-color);
+}
+
+.usageFillMedium {
+  background-color: var(--quota-medium-color);
+}
+
+.usageFillHigh {
+  background-color: var(--danger-color);
+}
+
+/* 未知额度：明确的占位样式，绝不画成 0% 的实心条 */
+.usageUnknownTrack {
+  height: 8px;
+  border-radius: var(--radius-full);
+  border: 1px dashed var(--border-primary);
+  background-color: transparent;
+}
+
+.usageValue {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text-secondary);
+}
+
+.usageReset {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+/* ------------------------------------------------------- 登录流程 */
+
+.stageBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.flowGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.flowField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.flowFieldLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.flowFieldValue {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.instruction {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.stageNotice {
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stageNoticeSuccess {
+  border-color: var(--success-border);
+  background-color: var(--success-soft);
+}
+
+.stageNoticeWarning {
+  border-color: var(--warning-border);
+  background-color: var(--warning-bg);
+}
+
+.stageNoticeMuted {
+  color: var(--text-secondary);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+/* ------------------------------------------------------- 导入 */
+
+.payloadArea {
+  width: 100%;
+  min-height: 120px;
+  font-family: var(--keeper-font-mono);
+  font-size: 12px;
+  resize: vertical;
+}
+
+.bodyLimitHint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.candidateList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.candidate {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-primary);
+}
+
+.candidateConflict {
+  border-color: var(--warning-border);
+  background-color: var(--warning-bg);
+}
+
+.candidateInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.candidateTitle {
+  font-weight: 600;
+}
+
+.decisionGroup {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.decisionOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.resultList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mono {
+  font-family: var(--keeper-font-mono);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+/* ------------------------------------------------------- 详情抽屉 */
+
+.drawerBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--keeper-section-gap);
+}
+
+.detailHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detailTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.modelToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.modelSelection {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  background-color: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settingsForm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.inlineSwitch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tabPanel {
+  padding-top: var(--keeper-section-gap);
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.secretHint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  border-left: 2px solid var(--border-primary);
+  padding-left: 8px;
+}
+
+.subtle {
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 768px) {
+  .usageRow {
+    grid-template-columns: 1fr;
+  }
+
+  .filterField {
+    min-width: 130px;
+    flex: 1 1 130px;
+  }
+
+  .accountIdentity {
+    max-width: 180px;
+  }
+}

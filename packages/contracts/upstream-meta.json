@@ -1,0 +1,25 @@
+{
+  "$comment": "上游契约来源记录；由 scripts/generate-contracts.mjs 校验，不要手工修改数值。",
+  "repository": "https://github.com/danger-dream/Parrot",
+  "branch": "main",
+  "commit": "9b73d058635470d59eef7a10876e6532649435d9",
+  "commitSubject": "chore: 发布 v0.33.1",
+  "release": "v0.33.1",
+  "snapshotFile": "upstream.openapi.json",
+  "snapshotSha256": "ab552e2f3c80f6db368297ef50240b95a34ee3150687d6c3f161280ef870a5e2",
+  "snapshotBytes": 2533037,
+  "openapiVersion": "3.1.0",
+  "infoTitle": "Parrot Management API (baseline snapshot)",
+  "generatedBy": "scripts/generate-contracts.mjs (dumps app.openapi() from an isolated checkout of the pinned commit; never starts the production server or loads user config)",
+  "isolation": {
+    "sourceCheckout": "git clone --depth 1 + git fetch --depth 1 <commit> (no user config, no data directory, no network targets)",
+    "python": "3.14",
+    "note": "导入时仅组合 management router；未启动 uvicorn、未连接任何真实 Parrot 实例、未读取用户凭据。"
+  },
+  "operationCount": 237,
+  "pathCount": 175,
+  "schemaCount": 495,
+  "routerCount": 24,
+  "allowlistFile": "mvp-routes.json",
+  "allowlistRouteCount": 76
+}

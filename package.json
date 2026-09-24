@@ -1,0 +1,35 @@
+{
+  "name": "parrot-webui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Parrot 独立 WebUI：React SPA + Fastify BFF，通过既有 /api/management/v1 管理本机 Parrot 实例",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@12.5.1",
+  "scripts": {
+    "contracts:generate": "node scripts/generate-contracts.mjs",
+    "contracts:build": "pnpm --filter @parrot-webui/contracts build",
+    "check:frontend-paths": "node scripts/check-frontend-paths.mjs",
+    "typecheck": "pnpm contracts:build && pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm contracts:build && pnpm -r test",
+    "test:e2e": "pnpm contracts:build && pnpm --filter @parrot-webui/e2e test",
+    "build": "pnpm contracts:build && pnpm --filter @parrot-webui/web build && pnpm --filter @parrot-webui/bff build",
+    "dev": "pnpm contracts:build && pnpm --parallel --filter @parrot-webui/bff --filter @parrot-webui/web dev",
+    "dev:bff": "pnpm contracts:build && pnpm --filter @parrot-webui/bff dev",
+    "dev:web": "pnpm contracts:build && pnpm --filter @parrot-webui/web dev",
+    "start": "node apps/bff/dist/index.js"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.9.1",
+    "typescript": "^5.9.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "@parcel/watcher",
+      "sass-embedded"
+    ]
+  }
+}

@@ -1,0 +1,312 @@
+/**
+ * 实时运行视图私有样式。
+ * 只使用 theme.scss 的 CSS 变量，不硬编码颜色、圆角与字号。
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--keeper-section-gap);
+  max-width: var(--keeper-page-max-width);
+}
+
+.headActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--keeper-control-height-sm);
+  padding: 0 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  background: var(--bg-secondary);
+  cursor: pointer;
+}
+
+.toggle input {
+  margin: 0;
+  accent-color: var(--primary-color);
+}
+
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--keeper-section-gap);
+}
+
+.refreshRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
+  color: var(--text-secondary);
+  font-size: var(--keeper-body-font-size);
+}
+
+.refreshRow strong {
+  color: var(--text-primary);
+}
+
+.note {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--keeper-card-subtitle-size);
+  line-height: 1.65;
+}
+
+/* ---------------------------------------------------------------- 卡片首屏氛围 */
+
+.page > section:first-child {
+  background:
+    radial-gradient(ellipse at 92% 0%, color-mix(in srgb, var(--primary-color) 9%, transparent), transparent 42%),
+    var(--bg-primary);
+}
+
+.page > section:first-child :global(.keeper-card__title) {
+  font-size: clamp(22px, 2vw, 28px);
+  letter-spacing: -0.025em;
+}
+
+.page > section:first-child :global(.keeper-card__subtitle) {
+  max-width: 780px;
+  line-height: 1.7;
+}
+
+/* ---------------------------------------------------------------- 分布摘要 */
+
+.summaryRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.summaryItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 320px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  background: var(--bg-secondary);
+  font-size: var(--keeper-body-font-size);
+}
+
+.summaryItem :global(.mono) {
+  max-width: 180px;
+}
+
+/* ---------------------------------------------------------------- 表格 */
+
+.scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-primary);
+}
+
+.table {
+  min-width: 980px;
+  border: 0;
+}
+
+.table :global(.keeper-table__header) {
+  min-height: 42px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.table :global(.keeper-table__row) {
+  min-height: 46px;
+  transition: background-color 120ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.table :global(.keeper-table__row:hover) {
+  background: var(--bg-secondary);
+}
+
+.colsProblems {
+  grid-template-columns: minmax(170px, 1.6fr) 120px 90px 120px minmax(180px, 1.6fr);
+}
+
+.colsChannels {
+  grid-template-columns: minmax(170px, 1.6fr) 80px 90px 80px minmax(190px, 1.4fr) minmax(140px, 1.1fr);
+}
+
+.colsKeys {
+  grid-template-columns: minmax(150px, 1.4fr) 70px 80px 70px 80px 110px 110px minmax(220px, 1.8fr);
+}
+
+.colsCooldowns {
+  grid-template-columns: minmax(140px, 1.2fr) minmax(140px, 1.2fr) 100px 80px 170px minmax(170px, 1.4fr);
+}
+
+.colsCalls {
+  grid-template-columns: 190px minmax(150px, 1.3fr) minmax(140px, 1.2fr) 120px 110px;
+}
+
+/* ---------------------------------------------------------------- 占用率 */
+
+.utilization {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.utilizationText {
+  font-family: var(--keeper-font-mono);
+  font-size: 11px;
+  min-width: 46px;
+}
+
+.meter {
+  display: inline-block;
+  width: 72px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--bg-tertiary);
+  overflow: hidden;
+}
+
+.meterFill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--primary-color);
+}
+
+.meterFillWarn {
+  background: var(--warning-color);
+}
+
+/* ---------------------------------------------------------------- 分页 */
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+}
+
+.pagerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pageSize {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pageSize select {
+  min-width: 72px;
+  height: var(--keeper-control-height-sm);
+  padding: 0 8px;
+}
+
+/* ---------------------------------------------------------------- 样本口径说明 */
+
+.sampleBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px dashed var(--border-primary);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
+}
+
+.sampleBox strong {
+  color: var(--text-primary);
+}
+
+.sampleLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* ---------------------------------------------------------------- 口径与限制 */
+
+.limits {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: var(--keeper-body-font-size);
+  line-height: 1.7;
+}
+
+/* ---------------------------------------------------------------- 移动端 */
+
+@media (max-width: 768px) {
+  .page > section:first-child :global(.keeper-card__title) {
+    font-size: 22px;
+  }
+
+  .page > section:first-child :global(.keeper-card__header) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .headActions {
+    width: 100%;
+  }
+
+  .refreshRow {
+    align-items: flex-start;
+  }
+
+  .pager {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pagerActions {
+    justify-content: space-between;
+  }
+
+  .summaryItem {
+    max-width: 100%;
+  }
+
+  .colsProblems,
+  .colsChannels,
+  .colsKeys,
+  .colsCooldowns,
+  .colsCalls {
+    min-width: 780px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table :global(.keeper-table__row) {
+    transition: none;
+  }
+}

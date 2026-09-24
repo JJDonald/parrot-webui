@@ -1,0 +1,8 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "tests/e2e"
+allowBuilds:
+  '@parcel/watcher': true
+  esbuild: true
+  sass-embedded: true
