@@ -12,6 +12,7 @@ import { encodeSegment } from '@/api/client';
 import { useApiQuery } from '@/api/hooks';
 import { CopyableText, JsonBlock, KeyValueList, MonoText, Pill, TimeText } from '@/components/bits';
 import { AsyncState } from '@/components/state';
+import { formatCostUsd } from '@/features/analysis/currency';
 import { LogBodySection } from './LogBodySection';
 import { SensitiveBodyNotice } from './LogNotices';
 import {
@@ -120,16 +121,16 @@ export function LogDetailDrawer({ logId, open, onClose, bodyCapability }: LogDet
                           value: `${formatCount(log.log.inputTokens)} / ${formatCount(log.log.outputTokens)}`,
                         },
                         {
-                          label: '成本（costTicks）',
-                          value: formatCount(log.log.costTicks),
+                          label: '成本（USD）',
+                          value: formatCostUsd(log.log.costTicks),
                           hint: COST_TICKS_HINT,
                         },
                         {
-                          label: '计费明细（billing，ticks）',
+                          label: '计费明细（USD）',
                           value: (
                             <span className="text-sm">
-                              costTicks {formatCount(log.log.billing.costTicks)} · actual {formatCount(log.log.billing.actualCostTicks)} ·
-                              estimated {formatCount(log.log.billing.estimatedCostTicks)} · 未定价成功 {formatCount(log.log.billing.unpricedSuccess)}
+                              总计 {formatCostUsd(log.log.billing.costTicks)} · 实际 {formatCostUsd(log.log.billing.actualCostTicks)} ·
+                              估算 {formatCostUsd(log.log.billing.estimatedCostTicks)} · 未定价成功 {formatCount(log.log.billing.unpricedSuccess)}
                             </span>
                           ),
                           hint: COST_TICKS_HINT,

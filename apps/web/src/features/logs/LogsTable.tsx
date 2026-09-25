@@ -11,6 +11,7 @@
 import { Button, Table } from 'antd';
 import type { TableProps } from 'antd';
 import { MonoText, Pill, RelativeTime, TimeText } from '@/components/bits';
+import { formatCostUsd } from '@/features/analysis/currency';
 import {
   COST_TICKS_HINT,
   formatCount,
@@ -111,12 +112,12 @@ export function LogsTable({ rows, onOpenDetail }: LogsTableProps) {
       render: (_value, row) => <span className="mono">{formatCount(row.retryCount)}</span>,
     },
     {
-      title: '成本（costTicks）',
+      title: '成本（USD）',
       key: 'costTicks',
       width: 140,
       render: (_value, row) => (
         <span className="mono" title={COST_TICKS_HINT}>
-          {formatCount(row.costTicks)}
+          {formatCostUsd(row.costTicks)}
         </span>
       ),
     },

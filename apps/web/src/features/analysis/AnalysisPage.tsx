@@ -5,6 +5,7 @@ import type { StatsBreakdownData, StatsDimension, StatsMetricData, StatsPeriod, 
 import { useApiQuery, usePollingInterval } from '@/api/hooks';
 import { AsyncState } from '@/components/state';
 import { MonoText, StatCard } from '@/components/bits';
+import { formatCostUsd } from './currency';
 import { ModelStatsDrawer } from './ModelStatsDrawer';
 import styles from './AnalysisPage.module.scss';
 
@@ -24,7 +25,7 @@ const sorts: Array<{ value: StatsSort; label: string }> = [
   { value: 'total', label: '请求数' },
   { value: 'success', label: '成功数' },
   { value: 'tokens', label: 'Token' },
-  { value: 'cost', label: '成本 ticks' },
+  { value: 'cost', label: '成本（USD）' },
   { value: 'latency', label: '响应时间' },
   { value: 'tps', label: 'Token / 秒' },
   { value: 'name', label: '名称' },
@@ -46,7 +47,7 @@ function metricRows(metrics: StatsMetricData) {
     { label: '成功率', value: rate(metrics), note: `重试请求 ${number(metrics.retriedRequests)}` },
     { label: '平均响应', value: typeof metrics.averageTotalMilliseconds === 'number' ? `${number(metrics.averageTotalMilliseconds)} ms` : '未提供', note: `平均首 Token ${typeof metrics.averageFirstTokenMilliseconds === 'number' ? `${number(metrics.averageFirstTokenMilliseconds)} ms` : '未提供'}` },
     { label: '缓存读取', value: number(metrics.cacheReadTokens), note: `缓存命中请求 ${number(metrics.cacheHitRequests)}` },
-    { label: '计费 ticks', value: number(metrics.costTicks), note: `实际 ${number(metrics.actualCostTicks)} · 估算 ${number(metrics.estimatedCostTicks)}` },
+    { label: '计费（USD）', value: formatCostUsd(metrics.costTicks), note: `实际 ${formatCostUsd(metrics.actualCostTicks)} · 估算 ${formatCostUsd(metrics.estimatedCostTicks)}` },
   ];
 }
 
@@ -58,7 +59,7 @@ const columns = (dimension: StatsDimension, onOpenModel: (id: string) => void): 
   { title: '输出 Token', key: 'output', align: 'right', render: (_, row) => number(row.metrics.outputTokens) },
   { title: '缓存读取', key: 'cache', align: 'right', render: (_, row) => number(row.metrics.cacheReadTokens) },
   { title: '平均响应', key: 'latency', align: 'right', render: (_, row) => typeof row.metrics.averageTotalMilliseconds === 'number' ? `${number(row.metrics.averageTotalMilliseconds)} ms` : '未提供' },
-  { title: '成本 ticks', key: 'cost', align: 'right', render: (_, row) => number(row.metrics.costTicks) },
+  { title: '成本（USD）', key: 'cost', align: 'right', render: (_, row) => formatCostUsd(row.metrics.costTicks) },
 ];
 
 export function AnalysisPage() {
@@ -117,7 +118,7 @@ export function AnalysisPage() {
 
     <section className="keeper-card keeper-card--flush">
       <div className="keeper-card__header">
-        <div className="keeper-card__heading"><h3 className="keeper-card__title">分组明细</h3><p className="keeper-card__subtitle">支持按渠道、模型或 API Key 查看上游分组指标；计费仅显示原始 ticks。</p></div>
+        <div className="keeper-card__heading"><h3 className="keeper-card__title">分组明细</h3><p className="keeper-card__subtitle">按渠道、模型或 API Key 查看计费金额（美元）；按上游 100 亿 ticks = 1 USD 换算。</p></div>
         <div className={styles.actions}>
           <label>维度 <Select aria-label="分析维度" value={dimension} options={dimensions} onChange={changeDimension} /></label>
           <label>排序 <Select aria-label="分组排序" value={sort} options={sorts} onChange={changeSort} /></label>

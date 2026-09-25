@@ -4,6 +4,7 @@ import { encodeSegment } from '@/api/client';
 import { useApiQuery } from '@/api/hooks';
 import { AsyncState } from '@/components/state';
 import { MonoText } from '@/components/bits';
+import { formatCostUsd } from './currency';
 import styles from './AnalysisPage.module.scss';
 
 function count(value: number | null | undefined) {
@@ -27,7 +28,7 @@ export function ModelStatsDrawer({ modelId, period, onClose }: { modelId: string
           <div><span>输入 Token</span><strong>{count(data.metrics.inputTokens)}</strong></div>
           <div><span>输出 Token</span><strong>{count(data.metrics.outputTokens)}</strong></div>
           <div><span>平均响应</span><strong>{typeof data.metrics.averageTotalMilliseconds === 'number' ? `${count(data.metrics.averageTotalMilliseconds)} ms` : '未提供'}</strong></div>
-          <div><span>计费 ticks</span><strong>{count(data.metrics.costTicks)}</strong></div>
+          <div><span>计费（USD）</span><strong>{formatCostUsd(data.metrics.costTicks)}</strong></div>
         </div>
         <h3>渠道分布</h3>
         {data.channels.length ? <Table rowKey="key" dataSource={data.channels} pagination={false} scroll={{ x: 'max-content' }} size="small" columns={[

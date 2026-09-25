@@ -33,6 +33,7 @@ import { LoginFlowPanel } from './LoginFlowPanel';
 import { OAuthSettingsPanel } from './OAuthSettingsPanel';
 import {
   accountInvalidationKeys,
+  useAccountDetailQuery,
   useAccountsListQuery,
   useBatchClearErrorsMutation,
   useBatchRefreshUsageMutation,
@@ -50,9 +51,11 @@ import {
   accountAvailabilityLabel,
   formatBoolean,
   formatCount,
+  formatPercent,
   operationIdFrom,
   providerLabel,
   readPageMeta,
+  usageWindowLabel,
   type OAuthAccountFilter,
   type OAuthAccountSort,
   type OAuthAccountListData,
@@ -70,6 +73,32 @@ const TAB_LABELS: Record<TabKey, string> = {
   invalid: '无效账号',
   settings: '相关设置',
 };
+
+function AccountQuotaCell({ account }: { account: OAuthAccountSummaryData }) {
+  const detail = useAccountDetailQuery(account.accountId);
+  const windows = detail.data?.data?.usageWindows.filter((window) =>
+    typeof window.remainingPercent === 'number' && Number.isFinite(window.remainingPercent),
+  );
+
+  return (
+    <div className={styles.accountCell}>
+      {detail.isPending ? <span className={styles.hint}>正在读取配额…</span> : null}
+      {detail.isError && !windows ? (
+        <span className={styles.hint}>配额读取失败 <button type="button" onClick={(event) => { event.stopPropagation(); void detail.refetch(); }}>重试</button></span>
+      ) : null}
+      {windows?.map((window) => (
+        <div className={styles.quotaWindow} key={window.name}>
+          <span className={styles.hint}>{usageWindowLabel(window.name)} · 剩余 {formatPercent(window.remainingPercent)}</span>
+          <span className={styles.usageTrack} role="progressbar" aria-label={`${usageWindowLabel(window.name)}剩余配额`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0, Math.min(100, window.remainingPercent!))}>
+            <span className={styles.usageFill} style={{ width: `${Math.max(0, Math.min(100, window.remainingPercent!))}%` }} />
+          </span>
+          {window.resetsAt ? <span className={styles.hint}>重置 <TimeText value={window.resetsAt} /></span> : null}
+        </div>
+      ))}
+      {detail.isError && windows?.length ? <span className={styles.hint}>配额可能已过期</span> : null}
+    </div>
+  );
+}
 
 export function AccountsPage() {
   const [tab, setTab] = useState<TabKey>('accounts');
@@ -168,16 +197,8 @@ export function AccountsPage() {
     {
       title: '额度 / 用量',
       key: 'quota',
-      width: 200,
-      render: (_value, account) => (
-        <div className={styles.accountCell}>
-          <span className={styles.hint}>额度受限（quotaLimited）：{formatBoolean(account.quotaLimited)}</span>
-          <span className={styles.hint}>可用（available）：{formatBoolean(account.available)}</span>
-          <span className={styles.hint}>
-            列表接口不返回额度数值：具体用量窗口与本地统计请打开详情查看（未知不会显示成 0 或无限）。
-          </span>
-        </div>
-      ),
+      width: 250,
+      render: (_value, account) => <AccountQuotaCell account={account} />,
     },
     {
       title: '模型',
@@ -301,7 +322,7 @@ export function AccountsPage() {
           <div className={styles.cardHeaderText}>
             <h2 className="keeper-card__title">OAuth 账号</h2>
             <p className="keeper-card__subtitle">
-              账号列表与详情来自上游 OAuth 账号接口；额度/用量只展示上游真实返回值，缺失即“未知”。
+              账号列表与详情来自上游 OAuth 账号接口；有剩余配额数据的窗口显示进度条。
               点击任意一行打开详情抽屉。
             </p>
           </div>

@@ -9,7 +9,7 @@
  * - POST   .../actions/refresh-usage                                   （202 → 任务面板）
  * - POST   .../actions/clear-errors / .../actions/clear-affinity        （204）
  *
- * 额度与用量只展示上游真实返回的字段：null / 缺失一律显示“未知”，绝不折算成 0 或无限。
+ * 用量窗口仅在上游返回剩余比例时显示；缺失的窗口不渲染。
  */
 
 import { useEffect, useState } from 'react';
@@ -39,6 +39,7 @@ import {
   formatUsd,
   operationIdFrom,
   providerLabel,
+  usageWindowLabel,
   type OAuthAccountDetailData,
   type OAuthUsageWindowData,
 } from './oauthTypes';
@@ -59,48 +60,26 @@ interface EditForm {
 }
 
 function UsageWindows({ windows }: { windows: OAuthUsageWindowData[] }) {
-  if (windows.length === 0) {
-    return (
-      <span className="text-tertiary">
-        上游没有返回任何用量窗口（usageWindows 为空）；这不代表额度为 0 或无限。
-      </span>
-    );
-  }
+  const visible = windows.filter((window) =>
+    typeof window.remainingPercent === 'number' && Number.isFinite(window.remainingPercent),
+  );
+  if (visible.length === 0) return null;
   return (
     <div className={styles.usageList}>
-      {windows.map((window) => {
+      {visible.map((window) => {
+        const remainingValue = window.remainingPercent!;
+        const remaining = formatPercent(remainingValue);
         const used = formatPercent(window.usedPercent);
-        const remaining = formatPercent(window.remainingPercent);
-        const usedValue = typeof window.usedPercent === 'number' ? window.usedPercent : null;
-        const fillClass =
-          usedValue === null
-            ? ''
-            : usedValue >= 90
-              ? styles.usageFillHigh
-              : usedValue >= 70
-                ? styles.usageFillMedium
-                : styles.usageFill;
         return (
           <div className={styles.usageRow} key={window.name}>
-            <span className={styles.usageName}>{window.name}</span>
-            {usedValue === null ? (
-              <span className={styles.usageUnknownTrack} aria-label="已用比例未知" title="上游未返回 usedPercent" />
-            ) : (
-              <span className={styles.usageTrack} aria-label={`已用 ${used}`}>
-                <span
-                  className={`${styles.usageFill} ${fillClass === styles.usageFill ? '' : fillClass}`}
-                  style={{ width: `${Math.max(0, Math.min(100, usedValue))}%` }}
-                />
-              </span>
-            )}
+            <span className={styles.usageName}>{usageWindowLabel(window.name)}</span>
+            <span className={styles.usageTrack} role="progressbar" aria-label={`${usageWindowLabel(window.name)}剩余配额`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0, Math.min(100, remainingValue))}>
+              <span className={styles.usageFill} style={{ width: `${Math.max(0, Math.min(100, remainingValue))}%` }} />
+            </span>
             <span className={styles.usageValue}>
-              {used ? `已用 ${used}` : '已用比例：未知'}
-              <br />
-              {remaining ? `剩余 ${remaining}` : '剩余额度：未知'}
-              <br />
-              <span className={styles.usageReset}>
-                重置：<TimeText value={window.resetsAt} />
-              </span>
+              剩余 {remaining}
+              {used ? <> · 已用 {used}</> : null}
+              {window.resetsAt ? <><br /><span className={styles.usageReset}>重置：<TimeText value={window.resetsAt} /></span></> : null}
             </span>
           </div>
         );
@@ -295,7 +274,7 @@ export function AccountDetailDrawer({
                         额度与用量
                       </span>
                       <span className="keeper-card__subtitle">
-                        只展示上游返回的 usageWindows / localStats；缺失即“未知”，不折算成 0 或无限额度。
+                        用量窗口只展示上游返回的剩余比例；没有数据的窗口不会显示。
                       </span>
                     </div>
                   </div>
@@ -309,11 +288,9 @@ export function AccountDetailDrawer({
                       />
                       <StatCard label="输入 Token" value={formatCount(stats.inputTokens) ?? '未知'} />
                       <StatCard label="输出 Token" value={formatCount(stats.outputTokens) ?? '未知'} />
-                      <StatCard
-                        label="成本（USD）"
-                        value={formatUsd(stats.costUsd) ?? '未知'}
-                        hint={stats.costUsd === null || stats.costUsd === undefined ? '上游未返回该项' : undefined}
-                      />
+                      {stats.costUsd !== null && stats.costUsd !== undefined ? (
+                        <StatCard label="成本（USD）" value={formatUsd(stats.costUsd)} />
+                      ) : null}
                     </div>
                   </div>
                 </div>

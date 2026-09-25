@@ -44,6 +44,7 @@ import {
   TimeText,
 } from '@/components/bits';
 import { useWriteCapability } from '@/app/AuthProvider';
+import { formatCostUsd } from '@/features/analysis/currency';
 import type {
   ApiKeyCreateRequest,
   ApiKeyData,
@@ -241,9 +242,9 @@ function UsageList({ usage, columns = 3 }: { usage: ApiKeyUsageData; columns?: n
             ),
         },
         {
-          label: 'costTicks / actualCostTicks',
-          value: <MonoText>{`${usage.costTicks} / ${usage.actualCostTicks}`}</MonoText>,
-          hint: '上游 tick 计数，WebUI 不换算货币',
+          label: '成本 / 实际成本（USD）',
+          value: <MonoText>{`${formatCostUsd(usage.costTicks)} / ${formatCostUsd(usage.actualCostTicks)}`}</MonoText>,
+          hint: '按上游 100 亿 ticks = 1 USD 换算',
         },
         { label: '有成本成功数', value: <MonoText>{String(usage.costedSuccess)}</MonoText> },
         { label: '未定价成功数', value: <MonoText>{String(usage.unpricedSuccess)}</MonoText> },

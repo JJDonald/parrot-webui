@@ -591,9 +591,9 @@ export function ChannelDetailDrawer({
                     hint="上游可能为 null"
                   />
                   <MetricItem
-                    label="cost"
-                    value={data.monthStats.cost ? <MonoText>{data.monthStats.cost}</MonoText> : '未知'}
-                    hint="上游字符串字段，WebUI 不做货币换算"
+                    label="成本（USD）"
+                    value={data.monthStats.cost ? <MonoText>${data.monthStats.cost}</MonoText> : '未知'}
+                    hint="上游 cost 字段已按美元返回"
                   />
                 </div>
               </DetailSection>

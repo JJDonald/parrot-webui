@@ -284,5 +284,5 @@ export function asDisplayText(text: string | null | undefined): unknown {
   return text;
 }
 
-/** 成本：上游只给 ticks，单位未提供，本页不做任何金额换算。 */
-export const COST_TICKS_HINT = '上游字段为 costTicks；单位未在本契约中提供，本页不做金额换算。';
+/** 上游 model_pricing.py 定义的计费单位。 */
+export const COST_TICKS_HINT = '按上游 100 亿 ticks = 1 USD 换算。';

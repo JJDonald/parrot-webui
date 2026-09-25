@@ -100,6 +100,13 @@
 
 /* ------------------------------------------------------- 额度 / 用量（未知即未知） */
 
+.quotaWindow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
 .usageList {
   display: flex;
   flex-direction: column;
@@ -122,6 +129,7 @@
 }
 
 .usageTrack {
+  display: block;
   position: relative;
   height: 8px;
   border-radius: var(--radius-full);
@@ -130,6 +138,7 @@
 }
 
 .usageFill {
+  display: block;
   height: 100%;
   border-radius: var(--radius-full);
   background-color: var(--success-color);

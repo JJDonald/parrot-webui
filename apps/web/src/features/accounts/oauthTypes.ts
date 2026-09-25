@@ -250,6 +250,13 @@ export function formatPercent(value: number | null | undefined): string | null {
   return `${Math.round(value * 10) / 10}%`;
 }
 
+/** 将上游用量窗口的内部名称显示为简短时间标签。 */
+export function usageWindowLabel(name: string): string {
+  if (name === 'fiveHour') return '5H';
+  if (name === 'sevenDay') return '7D';
+  return name;
+}
+
 export function formatCount(value: number | null | undefined): string | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
   return value.toLocaleString('zh-CN');
