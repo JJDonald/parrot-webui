@@ -58,14 +58,18 @@ export function AppShell({ theme, onThemeChange, children }: {
           {upstream && !upstream.reachable ? <Pill tone="danger">上游不可达</Pill>
             : upstream && upstream.managementApiDetected === false ? <Pill tone="warning">管理 API 未就绪</Pill>
               : <Pill tone="success">上游正常</Pill>}
-          <label className="keeper-header__theme">
-            <span className="visually-hidden">主题</span>
-            <select className="input" value={theme} onChange={(event) => onThemeChange(event.target.value as ThemeName)} aria-label="主题">
-              {THEME_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </label>
-          <button type="button" className="btn btn--sm btn--secondary" onClick={() => void refreshSession()}>刷新会话</button>
-          <button type="button" className="btn btn--sm btn--ghost" disabled={loggingOut} onClick={async () => {
+          <div className="keeper-theme-switcher" role="radiogroup" aria-label="主题">
+            {THEME_OPTIONS.map((option) => <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={theme === option.value}
+              className={`keeper-theme-switcher__pill${theme === option.value ? ' is-active' : ''}`}
+              onClick={() => onThemeChange(option.value)}
+            >{option.label}</button>)}
+          </div>
+          <button type="button" className="btn btn--sm btn--secondary keeper-header__pill-btn" onClick={() => void refreshSession()}>刷新会话</button>
+          <button type="button" className="btn btn--sm btn--ghost keeper-header__pill-btn" disabled={loggingOut} onClick={async () => {
             setLoggingOut(true);
             try { await logout(); } finally { setLoggingOut(false); }
           }}>{loggingOut ? '退出中…' : '退出登录'}</button>

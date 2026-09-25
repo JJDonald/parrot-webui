@@ -4,7 +4,7 @@
  * 安全约定：秘密值只在当前视图内存中存在；原始内容一律按纯文本渲染（禁止 dangerouslySetInnerHTML）。
  */
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 
 export type Tone = 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'muted';
 
@@ -192,21 +192,32 @@ export function KeyValueList({
   );
 }
 
-export function StatCard({ label, value, hint, tone }: { label: string; value: ReactNode; hint?: ReactNode; tone?: Tone }) {
-  const color =
-    tone === 'danger'
-      ? 'var(--danger-color)'
-      : tone === 'success'
-        ? 'var(--success-color)'
-        : tone === 'warning'
-          ? 'var(--warning-color)'
-          : undefined;
+export function StatCard({
+  label,
+  value,
+  hint,
+  tone,
+  accent,
+}: {
+  label: string;
+  value: ReactNode;
+  hint?: ReactNode;
+  tone?: Tone;
+  /** 可选强调色（CSS 颜色），覆盖 .stat-grid 的轮换色；仅视觉用途。 */
+  accent?: string;
+}) {
+  const semantic = tone === 'danger' || tone === 'success' || tone === 'warning' ? tone : undefined;
   return (
-    <div className="stat-card">
-      <span className="stat-card__label">{label}</span>
-      <span className="stat-card__value" style={color ? { color } : undefined}>
-        {value}
+    <div
+      className="stat-card"
+      data-tone={semantic}
+      style={accent ? ({ '--accent': accent } as CSSProperties) : undefined}
+    >
+      <span className="stat-card__head">
+        <span className="stat-card__label">{label}</span>
+        <span className="stat-card__dot" aria-hidden="true" />
       </span>
+      <span className="stat-card__value">{value}</span>
       {hint ? <span className="stat-card__hint">{hint}</span> : null}
     </div>
   );

@@ -4,7 +4,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { StatsBreakdownData, StatsDimension, StatsMetricData, StatsPeriod, StatsSort, StatsSummaryData } from '../../../../../packages/contracts/generated/upstream-mvp';
 import { useApiQuery, usePollingInterval } from '@/api/hooks';
 import { AsyncState } from '@/components/state';
-import { MonoText } from '@/components/bits';
+import { MonoText, StatCard } from '@/components/bits';
 import { ModelStatsDrawer } from './ModelStatsDrawer';
 import styles from './AnalysisPage.module.scss';
 
@@ -86,11 +86,11 @@ export function AnalysisPage() {
   const changePeriod = (value: StatsPeriod) => { setPeriod(value); setPage(1); };
 
   return <div className={styles.page}>
-    <section className={styles.intro}>
-      <div>
-        <span className={styles.eyebrow}>USAGE ANALYSIS</span>
-        <h2>用量分析</h2>
-        <p>查看 Parrot 已记录的请求、Token、延迟和计费数据。统计口径以当前上游返回值为准。</p>
+    <section className={`keeper-card ${styles.intro}`}>
+      <div className="keeper-card__heading">
+        <span className="app-topbar__eyebrow">Usage Analysis</span>
+        <h2 className="keeper-card__title">用量分析</h2>
+        <p className="keeper-card__subtitle">查看 Parrot 已记录的请求、Token、延迟和计费数据。统计口径以当前上游返回值为准。</p>
       </div>
       <div className={styles.actions}>
         <label>统计周期 <Select aria-label="统计周期" value={period} options={periods} onChange={changePeriod} /></label>
@@ -100,10 +100,8 @@ export function AnalysisPage() {
 
     <AsyncState<StatsSummaryData> isLoading={summary.isLoading} error={summary.error} data={summary.data?.data ?? undefined} onRetry={() => void summary.refetch()} isStale={summary.isError && Boolean(summary.data)}>
       {(data) => <>
-        <section className={styles.metrics} aria-label="总体指标">
-          {metricRows(data.overall).map((item) => <article className={styles.metric} key={item.label}>
-            <span>{item.label}</span><strong>{item.value}</strong><small>{item.note}</small>
-          </article>)}
+        <section className={`stat-grid ${styles.metrics}`} aria-label="总体指标">
+          {metricRows(data.overall).map((item) => <StatCard key={item.label} label={item.label} value={item.value} hint={item.note} />)}
         </section>
         {families.length > 0 && <section className={`keeper-card ${styles.families}`}>
           <div className="keeper-card__header"><div className="keeper-card__heading"><h3 className="keeper-card__title">模型族概况</h3><p className="keeper-card__subtitle">各模型族直接使用上游统计值；可能共享同一请求，不跨族相加。</p></div></div>

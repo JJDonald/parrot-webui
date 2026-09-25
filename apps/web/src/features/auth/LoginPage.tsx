@@ -40,23 +40,40 @@ export function LoginPage() {
 
   return (
     <div className={styles.loginPage}>
-      <div className={`stack ${styles.loginFrame}`}>
-        <div className={`keeper-card ${styles.loginCard}`} style={{ borderRadius: 'var(--keeper-login-card-radius)' }}>
-          <div className="keeper-card__heading" style={{ marginBottom: 16 }}>
-            <span className="app-topbar__eyebrow">Parrot Management</span>
-            <h1 className="keeper-card__title" style={{ fontSize: 26 }}>
-              {bootstrap?.instanceName ?? 'Parrot'} 管理台
-            </h1>
-            <p className="keeper-card__subtitle">
-              独立 WebUI，通过已有管理 API 操作同一实例；与 Telegram 管理共用业务状态。
-            </p>
+      <div className={styles.loginFrame}>
+        <section className={styles.brand} aria-label="实例信息">
+          <div className={styles.brandMark} aria-hidden="true">
+            P
           </div>
-
-          <div className="row" style={{ gap: 8, marginBottom: 16 }}>
+          <span className="app-topbar__eyebrow">Parrot Management</span>
+          <h1 className={styles.brandTitle}>{bootstrap?.instanceName ?? 'Parrot'} 管理台</h1>
+          <p className={styles.brandLead}>
+            独立 WebUI，通过已有管理 API 操作同一实例；与 Telegram 管理共用业务状态。
+          </p>
+          <div className="row" style={{ gap: 8 }}>
             {bootstrap ? <Pill mono>契约 {bootstrap.contract.release}</Pill> : null}
             {bootstrap ? <Pill mono>{bootstrap.contract.operationCount} 个上游操作</Pill> : null}
             {upstream === null ? <Pill tone="muted">正在检测上游</Pill> : upstream.reachable ? <Pill tone="success">上游可达</Pill> : <Pill tone="danger">上游不可达</Pill>}
           </div>
+          <div className={styles.brandInfo}>
+            <strong>关于这个管理台</strong>
+            <span>
+              它是 Parrot 管理 API 的独立客户端：不修改原容器与镜像，不读取原数据目录，
+              上游会话凭证只保存在 WebUI 后端内存中，浏览器只持有 HttpOnly Cookie。
+            </span>
+            <span>
+              尚未实现的登录方式：Telegram 批准登录（第二阶段）。因此这里不显示任何无法使用的登录按钮。
+            </span>
+          </div>
+        </section>
+
+        <section className={styles.loginPanel}>
+          <div className={`keeper-card ${styles.loginCard}`}>
+            <div className="keeper-card__heading" style={{ marginBottom: 18 }}>
+              <span className="app-topbar__eyebrow">Sign in</span>
+              <h2 className="keeper-card__title">使用管理密钥登录</h2>
+              <p className="keeper-card__subtitle">登录后获得本地会话，密钥不会离开本次请求。</p>
+            </div>
 
           {upstreamUnreachable ? (
             <div className="error-box" role="alert" style={{ marginBottom: 16 }}>
@@ -181,20 +198,8 @@ export function LoginPage() {
               </span>
             </div>
           </form>
-        </div>
-
-        <div className={`notice-box ${styles.loginInfo}`}>
-          <div className="stack" style={{ gap: 6 }}>
-            <strong>关于这个管理台</strong>
-            <span>
-              它是 Parrot 管理 API 的独立客户端：不修改原容器与镜像，不读取原数据目录，
-              上游会话凭证只保存在 WebUI 后端内存中，浏览器只持有 HttpOnly Cookie。
-            </span>
-            <span>
-              尚未实现的登录方式：Telegram 批准登录（第二阶段）。因此这里不显示任何无法使用的登录按钮。
-            </span>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
