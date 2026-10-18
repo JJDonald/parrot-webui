@@ -108,6 +108,7 @@
 | P2-15 | `errors.ts` 超时文案对 GET 也写「写操作结果未知」 | 改「若为写操作则结果未知」；同步修正 `security.test.ts` 的 `toContain` 断言 |
 | P3-1 | `WEBUI_SESSION_EXPIRED` 定义了却从不抛出 | 区分语义：无 Cookie → `REQUIRED`，持失效 Cookie → `EXPIRED` 并清 Cookie（两者同为 401，前端并入同一转登录流程）；新增 2 条用例 |
 | P3-2 | 生产镜像含约 88 MB 无用前端依赖 | **未修复**：实测 `pnpm install --prod --filter @parrot-webui/bff...` 可把 node_modules 从 117.6 MB 降到 17.4 MB（省 ~100 MB），但当前 Dockerfile 后续阶段依赖 `apps/bff/node_modules` 路径，改动面大于收益，记为后续优化项 |
+| P3-3 | 本地 Node 24 上 `pnpm test` 偶发非零退出（约 5%，用例全过） | **上游竞态，未改代码**：栈为 `tinypool@1.1.1` 在 worker 已关闭后仍 `process.send`，`Error: Channel closed` / `code: 'ERR_IPC_CHANNEL_CLOSED'`，无任何断言失败。实测分布：Node 24 下 2/40 失败；**Node 22（即 CI 与 `engines` 下限）下 0/70 失败**；调整 `--pool`（forks/threads）、`--no-file-parallelism`、`singleFork` 均不改变出现率，且旧的 4 个测试文件单独跑也能复现（早于本轮新增用例）。结论：不吞异常、不改测试去迁就它；CI 跑 Node 22 不受影响，本地若遇到重跑即可 |
 
 ---
 
