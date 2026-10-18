@@ -37,6 +37,9 @@ pnpm contracts:generate
 # 只校验，不写任何文件（CI/构建阶段用；失败时退出码非 0）
 pnpm contracts:generate --check
 
+# 生成物漂移校验：重新生成到临时目录并与已提交产物比对，不一致即失败
+pnpm contracts:verify
+
 # 在默认行为之外，额外提示如何生成"全量类型"（体积较大，默认不生成）
 pnpm contracts:generate --full
 ```
@@ -47,6 +50,7 @@ pnpm contracts:generate --full
 node scripts/generate-contracts.mjs            # 校验 + 生成
 node scripts/generate-contracts.mjs --check    # 只校验
 node scripts/generate-contracts.mjs --full     # 校验 + 生成 + 全量类型提示
+node scripts/generate-contracts.mjs --out-dir <目录>   # 生成到指定目录（不碰仓库，供 verify 使用）
 ```
 
 `--check` 与默认行为的差别（脚本实际逻辑）：
@@ -54,6 +58,7 @@ node scripts/generate-contracts.mjs --full     # 校验 + 生成 + 全量类型�
 - 默认：先做全部校验，通过后写入 `packages/contracts/generated/management-routes.ts`、
   `packages/contracts/generated/upstream-mvp.d.ts`，并用实际条数刷新 `upstream-meta.json` 的 `allowlistRouteCount`。
 - `--check`：只做校验并打印结论，**不写文件**（因此不会因为校验"顺带"修改生成物）。
+- `--out-dir <目录>`：把生成物写到指定目录（目录须已存在），仓库内文件一概不动；`contracts:verify` 用它在临时目录里重建再比对。
 - `--full`：本身不生成全量类型，只在输出中提示执行
   `pnpm exec openapi-typescript packages/contracts/upstream.openapi.json -o packages/contracts/generated/upstream.full.d.ts`。
   该文件体积大，默认不生成、也不必纳入版本控制（按团队约定决定）。
@@ -77,7 +82,18 @@ node scripts/generate-contracts.mjs --full     # 校验 + 生成 + 全量类型�
    - `excluded.phase2` 中列出的路径在快照里找不到匹配。
 
 注意：`--check` **不校验** `generated/` 下的生成物是否与当前允许清单同步（它只校验快照与允许清单）。
-需要“生成物零漂移”的检查请用：
+需要"生成物零漂移"的检查请用：
+
+```bash
+pnpm contracts:verify
+```
+
+`scripts/verify-contracts.mjs` 会把生成物重新生成到一个临时目录（`--out-dir` 模式，绝不写仓库），
+再与仓库中已提交的 `packages/contracts/generated/management-routes.ts`、`generated/upstream-mvp.d.ts`
+和 `upstream-meta.json` 逐字节比对（先统一换行，避免 `core.autocrlf` 干扰），有差异即列出首个差异行并以 1 退出。
+它已经接入 `Dockerfile` 构建阶段，漂移会直接中断镜像构建。
+
+等价的原始写法（会写仓库、依赖 git 是否干净）：
 
 ```bash
 pnpm contracts:generate && git diff --exit-code packages/contracts   # 期望无差异
@@ -100,8 +116,10 @@ pnpm contracts:generate && git diff --exit-code packages/contracts   # 期望无
 扩展步骤（缺一不可）：
 
 1. 在 `mvp-routes.json` 的 `routes[]` 里新增条目，`path` 必须与快照逐字一致（含参数占位写法）。
-2. `pnpm contracts:generate`（重新生成冻结路由表与类型，并刷新 `allowlistRouteCount`）。
-3. `pnpm typecheck`、`pnpm test`；BFF 侧同步更新对应用法的实现与测试。
+2. `pnpm contracts:generate`（重新生成冻结路由表与类型，并刷新 `allowlistRouteCount`），
+   然后把 `packages/contracts/generated/` 与 `upstream-meta.json` 的改动一起提交。
+3. `pnpm contracts:verify` 确认生成物与允许清单同步；`pnpm typecheck`、`pnpm test`；
+   BFF 侧同步更新对应用法的实现与测试。
 4. 代码评审时确认：这条路由确实属于 MVP 范围，写操作有对应的鉴权/CSRF/体积/幂等处理。
 
 缩小或调整范围同理：删除条目后重新生成并跑测试。`excluded.phase2` 的条目本身不参与放行。

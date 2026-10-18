@@ -31,6 +31,10 @@ pnpm typecheck
 pnpm test
 pnpm build
 
+# 构建完成后对真实产物做两轮冒烟（不连接任何真实 Parrot，上游是本地假服务）
+pnpm --filter @parrot-webui/e2e test:smoke       # 18 项：development 形态
+pnpm --filter @parrot-webui/e2e test:smoke:prod  # 31 项：production 形态（__Secure- Cookie / HSTS / .map 404 / 预压缩）
+
 # 构建镜像
 docker compose build            # 或：docker build -t parrot-webui:local .
 
@@ -40,7 +44,8 @@ docker tag parrot-webui:local parrot-webui:0.1.0
 
 镜像构建阶段做的事（`Dockerfile`）：锁定 Node 24 + pnpm、`--frozen-lockfile` 安装依赖、
 `pnpm contracts:generate --check` 校验上游契约（快照哈希 + 76 条允许清单逐条核对）、
-构建 web（`apps/web/dist`）与 bff（`apps/bff/dist`）。
+构建 web（`apps/web/dist`）并生成 `.br`/`.gz` 预压缩兄弟文件、构建 bff（`apps/bff/dist`），
+最后断言产物中不存在 `*.map`（存在即构建失败）。
 运行镜像只含生产依赖 + 静态产物 + BFF 产物，以非 root 用户 `node` 运行。
 
 未允许对外发布镜像时不要推送镜像仓库；只做本地可构建镜像与发布步骤记录。
@@ -105,6 +110,9 @@ ss -ltnp | grep ':3000'                        # 不应出现 0.0.0.0:3000 / [::
   两个片段都保留 `/webui/` 前缀（`proxy_pass` 末尾不加 URI / 不写 `handle_path`），
   并把 `/webui/health`、`/webui/health/*` 直接 404。
   域名占位符 `parrot.example.com` 必须替换为实际域名。
+  两个片段的**唯一已知能力差异**是请求体上限：Nginx 片段带了 `client_max_body_size 5m`，
+  Caddy 的 `request_body` 指令要求 Caddy v2.10+，因此片段里保留为注释，需按现场版本决定是否启用；
+  未启用时超大请求会先被完整送进容器再由 BFF 拒绝（BFF 默认 1 MiB、OAuth 导入 5 MiB、登录路由 16 KiB）。
 - **方案 B（入口代理也是容器）**：按 `compose.yaml` 顶部的注释改：
   删除 `ports:`，改为 `expose: ["3000"]` + `networks: [existing-ingress]`（网络 `external: true`），
   入口代理通过服务名访问：`proxy_pass http://webui:3000;`（仍不加尾斜杠）。
@@ -125,6 +133,13 @@ reload 后必须回归检查原推理流式接口、原管理 API、MCP 等既�
 
 ## 5. 验收（逐条记录结果，未执行不要写"通过"）
 
+代码/产物侧（部署前在构建机执行，不需要真实 Parrot）：
+
+- [ ] `pnpm typecheck` 四个包全部通过。
+- [ ] `pnpm test` 全绿（最新 116 例：BFF 78 + Web 30 + E2E 8）。
+- [ ] `pnpm --filter @parrot-webui/e2e test:smoke` 18/18 通过。
+- [ ] `pnpm --filter @parrot-webui/e2e test:smoke:prod` 31/31 通过（含 `__Secure-` Cookie、HSTS、`.map` 404 与预压缩协商）。
+
 浏览器侧：
 
 - [ ] 访问 `https://<域名>/webui`（无尾斜杠）得到 308 跳转到 `/webui/`。
@@ -135,6 +150,9 @@ reload 后必须回归检查原推理流式接口、原管理 API、MCP 等既�
 - [ ] 用 IP:443 或错误 Host 访问不能拿到本项目页面/API。
 - [ ] 外部访问 `https://<域名>/webui/health/live` 得到 404（健康检查不对外）。
 - [ ] 浏览器开发工具和 BFF 日志里看不到 Parrot 管理密钥、上游 Session、OAuth token 或请求/响应正文。
+- [ ] 「版本与诊断」页的 `requestSource.remoteTrusted` 为 `true`、`warning` 为空；两个不同客户端的 `clientIp` 不同
+      （这一项直接决定来源限流是否真的生效，配错不会报错、只会静默退化成共享桶）。
+- [ ] 静态资源的响应带 `content-encoding: br` 或 `gzip`（预压缩生效），且 `/webui/assets/*.map` 返回 404。
 
 **公网端口拒绝验证（必须从另一台公网机器执行，不能只在本机测、不能只测认证拒绝）：**
 
@@ -229,6 +247,11 @@ rm -f .env
 1. 实际 Parrot 版本、管理 API 就绪情况与监听端口/绑定地址；容器到该地址的可达路径。
 2. 现有域名与实际使用的访问方式（是否有 CDN、是否有第二层代理）。
 3. `WEBUI_TRUST_PROXY` 的真实取值（入口代理自身地址/CIDR）。
+   容器化部署时它**不是** `127.0.0.1`：BFF 看到的直连对端通常是 Docker 网桥网关。
+   取法：`docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}'`（默认桥）
+   或 `docker network inspect <自定义网络> ...`（方案 B）。填完后登录进「版本与诊断」页，
+   确认 `requestSource.remoteTrusted === true` 且 `requestSource.warning` 为空；
+   再用两个不同客户端各失败登录一次，确认 `clientIp` 不同（相同就说明来源退化成了一个共享桶）。
 4. 入口软件是 Nginx 还是 Caddy、配置目录与 reload 方式、是否 `default_server`。
 5. Docker Desktop（Windows/macOS）还是 Linux 宿主：`host.docker.internal` 行为不同，必须实测。
 6. 真实浏览器上的 Cookie/重定向行为，以及两端入口在公网的端口拒绝验证结果。

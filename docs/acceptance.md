@@ -38,7 +38,7 @@
 
 ### 2.3 前端（M2/M3 页面）
 
-- 路由与布局：`/webui/` 前缀、`BrowserRouter basename=/webui`、左侧导航 + 玻璃顶栏 + 主内容区、移动端抽屉侧栏、三套主题（纸感米色 / 纯白 / 暖炭黑，令牌取自参考项目 cpa-usage-keeper）。
+- 路由与布局：`/webui/` 前缀、`BrowserRouter basename=/webui`、顶部胶囊导航（`apps/web/src/app/AppShell.tsx` 的 `keeper-header` + `keeper-dock`，窄屏横向滚动而非抽屉侧栏）+ 主内容区、三套主题（纸感米色 / 纯白 / 暖炭黑，令牌取自参考项目 cpa-usage-keeper）。页面路由级懒加载，每个页面外层有独立 ErrorBoundary。
 - 统一数据层：`apps/web/src/api/client.ts` 是唯一 BFF 客户端（自动附加 CSRF、统一归一化错误、区分上游/传输错误）；`hooks.ts` 固化「mutation 不重试、query 仅对传输类错误有限重试、后台标签页降频」；`operations.tsx` 实现 202 任务跟踪（1s→2s→5s 轮询、仅 `cancellable` 可取消、终态停止、404 视为记录不可用并刷新业务资源、部分成功提示）。
 - 通用组件：六态展示（加载/正常/空数据/失败/权限不足/连接中断）、错误与冲突提示（409 不自动覆盖、`SAVED_RELOAD_UNCONFIRMED` 禁止重放、429 显示等待时间）、徽标/时间/秘密值/原始内容（纯文本）/危险操作确认。
 - 页面：登录、总览、渠道、OAuth 账号、模型中心、下游 API Key、请求日志、管理任务、版本与诊断。
@@ -56,14 +56,15 @@
 | --- | --- |
 | `pnpm contracts:generate` | 通过：`校验通过：76 条允许路由全部存在于快照；快照哈希匹配`；生成 76 条冻结路由 + 222 个 schema 类型 |
 | `pnpm typecheck`（contracts / bff / e2e / web 四个包） | 全部通过（`typecheck: Done` × 4，无 `error TS`） |
-| `pnpm test` | 通过：**71 个用例全绿**。BFF 4 个文件 43 例；Web 2 个文件 20 例；E2E 1 个文件 8 例 |
+| `pnpm test` | 通过：**最新一次为 116 个用例全绿**。BFF 6 个文件 78 例；Web 4 个文件 30 例；E2E 1 个文件 8 例。历史基线为 81 例（Web 30 + BFF 43 + E2E 8），后续补了传输层 14 例与修复项回归 21 例 |
 | `pnpm build` | 通过：`packages/contracts` 编译为 ES 模块 + d.ts；Vite 构建 `apps/web/dist`（`✓ built in 6.82s`）；`tsc` 构建 `apps/bff/dist` |
-| `pnpm --filter @parrot-webui/e2e test:smoke` | 通过：**14/14**，见下方"构建产物冒烟测试" |
+| `pnpm --filter @parrot-webui/e2e test:smoke` | 通过：**18/18**，见下方"构建产物冒烟测试" |
+| `pnpm --filter @parrot-webui/e2e test:smoke:prod` | 通过：**31/31**，见下方"生产模式冒烟测试" |
 | `docker compose config`（以 `.env.example` 为 env-file） | 通过：`name: parrot-webui`，端口仅 `host_ip: 127.0.0.1, published: 3000`；缺少 `.env` 时按设计报必填变量缺失 |
 | Docker 上下文依赖安装（模拟 Dockerfile 阶段） | 通过：`pnpm install --frozen-lockfile`（320 包）与 `pnpm install --prod --frozen-lockfile`（167 包）均在只含 Dockerfile 所 COPY 文件的目录中成功 |
 | `docker build` / `docker compose up -d --build` | **未执行**：本机 Docker 守护进程不可用；镜像构建与容器运行未验证 |
 
-### 3.1 BFF 安全用例（43 例，`pnpm --filter @parrot-webui/bff test`）
+### 3.1 BFF 安全用例（78 例，`pnpm --filter @parrot-webui/bff test`）
 
 - 未登录访问业务代理 → 401 `WEBUI_SESSION_REQUIRED`，且假上游**零请求**；
 - Host 不符 → 421；Origin 缺失 / `null` / 错误 / 协议不符 → 403；CSRF 缺失 / 错误 → 403（含正向对照：正确请求确实被转发）；
@@ -75,35 +76,71 @@
 - 会话：登录后 Cookie 属性正确且响应体/头部/Cookie 中无 credential；会话 ID 与 CSRF 轮换、预登录不可复用；注销吊销上游并让旧 Cookie 立即失效（缺 CSRF/Origin 时拒绝且保留会话）；上游不可达时注销仍销毁本地会话（`unconfirmed`）；两个浏览器凭证独立、注销不串会话；`maxSessions=1` 时第二个登录 429 且不驱逐已有会话；上游 401 与业务请求 401 均清理会话；
 - 配置校验：缺 `PARROT_BASE_URL`、base path 非 `/webui/`、生产 http 来源、上游 URL 带路径/凭据、等于 `WEBUI_PUBLIC_ORIGIN`、生产 trust proxy 为空或 `*` 全部失败；
 - 限流与来源：bootstrap 单来源限流 429 + `retry-after`，不同来源互不影响；伪造 XFF 在直连不可信时被忽略。
+- **传输层（`test/transport.test.ts`，14 例）**：畸形 JSON 与空 JSON 体 → 400 `WEBUI_INVALID_REQUEST` 且带 `cache-control: no-store`（修复前畸形 JSON 是 500）；登录超 16 KiB → 413 且上游零触达；`health/live` 不受上游影响；**上游关闭后 `health/ready` 仍 200**（就绪判据是静态产物），静态产物缺失时 503；生产模式 Cookie 为 `__Secure-` 前缀 + `Secure`/`HttpOnly`/`SameSite=Lax`/无 `Domain`；HSTS；`.map` 即便真实存在也返回 404；Brotli/Gzip 协商命中预压缩兄弟文件。
+- **修复项回归（`test/fixes.test.ts`，21 例）**：`FST_ERR_CTP_INVALID_JSON_BODY` 映射；会话绝对上限以 `createdAt` 为锚点（连续刷新不得延长）；query 净化的放行/拦截边界（含 `%00` 控制字符与真相对路径）；`/stats/models/{modelId}` 的 Starlette `:path` 转换器（含斜杠的模型 id 可达）；idempotency-key 仅透传 1–128 字符；限流器固定窗口语义与 `pinnedKeys` 不被容量淘汰；`sessionPayload` 不再依赖模块级可变状态；401 语义区分（无 Cookie → `WEBUI_SESSION_REQUIRED`，持失效 Cookie → `WEBUI_SESSION_EXPIRED` 并清 Cookie）。
 
 ### 3.2 端到端链路（8 例，`pnpm --filter @parrot-webui/e2e test`）
 
 真实 HTTP + 真实 Cookie/CSRF：bootstrap → 登录（管理密钥换票）→ 读取渠道 → 409 冲突 → 允许清单外路径与编码绕过 → 注销 → 健康检查。关键断言见 3.1 与 3.3。
 
-### 3.3 构建产物冒烟测试（14 例，`pnpm --filter @parrot-webui/e2e test:smoke`）
+### 3.3 构建产物冒烟测试（18 例，`pnpm --filter @parrot-webui/e2e test:smoke`）
 
 直接启动 `apps/bff/dist/index.js` 并用 `apps/web/dist` 提供页面，验证交付形态（非源码形态）：
 
 1. 进程启动并就绪（`/webui/health/live` 不依赖上游）；
 2. `GET /webui/` 返回 SPA 首页；`index.html` 使用 `no-cache, must-revalidate`；
 3. `assets/*` 使用 `public, max-age=31536000, immutable`；
-4. CSP 含 `script-src 'self'`、`frame-ancestors 'none'`，并带 `nosniff`、`no-referrer`；
-5. 深链接 `/webui/channels` 走 SPA fallback；
-6. bootstrap 返回实例名、`["managementKey"]` 与预登录 CSRF，且**不包含**上游内部地址；
-7. 未登录业务请求 401 `WEBUI_SESSION_REQUIRED`；
-8. 登录缺 Origin/CSRF → 403 `WEBUI_ORIGIN_REJECTED`；
-9. 未知 `/webui/bff/*` → JSON 404（带 `WEBUI_` code）；
-10. 域名根下的 `/api/...` → 404（不提供第二套入口）；
-11. 错误 Host → 421 `WEBUI_HOST_REJECTED`；健康检查同样校验 Host。
+4. **`.map` 请求返回 404**（构建产物不含 sourcemap，托管层再拦一道）；
+5. **Brotli / Gzip 预压缩产物被正确协商，且解压后与原件逐字节一致**；
+6. CSP 含 `script-src 'self'`、`frame-ancestors 'none'`，并带 `nosniff`、`no-referrer`；
+7. 深链接 `/webui/channels` 走 SPA fallback；
+8. bootstrap 返回实例名、`["managementKey"]` 与预登录 CSRF，且**不包含**上游内部地址；
+9. 未登录业务请求 401 `WEBUI_SESSION_REQUIRED`；
+10. 登录缺 Origin/CSRF → 403 `WEBUI_ORIGIN_REJECTED`；
+11. 未知 `/webui/bff/*` → JSON 404（带 `WEBUI_` code）；
+12. 域名根下的 `/api/...` → 404（不提供第二套入口）；
+13. 错误 Host → 421 `WEBUI_HOST_REJECTED`；健康检查同样校验 Host。
+
+### 3.3.1 生产模式冒烟测试（31 项，`pnpm --filter @parrot-webui/e2e test:smoke:prod`）
+
+`smoke-built.mjs` 跑在 `NODE_ENV=development` + 明文 HTTP 下，因此 `__Secure-` Cookie 前缀、`Secure` 属性、HSTS 这几条**只在生产分支才成立**的行为在修复前没有任何自动化覆盖。`tests/e2e/smoke-production.mjs` 用同一套真实构建产物以 `NODE_ENV=production` 启动 BFF（`WEBUI_PUBLIC_ORIGIN=https://webui.example.com`），逐项验证：
+
+1. 生产模式进程启动并就绪；
+2. bootstrap 200 且不泄露上游内部地址/端口；
+3. Cookie 为 `__Secure-parrot_webui_prelogin`，带 `Secure`/`HttpOnly`/`SameSite=Lax`/`Path=/webui/`，且**没有** `Domain`；
+4. HSTS 为 `max-age=31536000; includeSubDomains`；
+5. CSP 含 `script-src 'self'` 与 `frame-ancestors 'none'`；`X-Frame-Options: DENY`、`nosniff`、`no-referrer`；
+6. 错误 Origin → 403 `WEBUI_ORIGIN_REJECTED`；
+7. **畸形 JSON → 400 `WEBUI_INVALID_REQUEST`**（修复前是 500），且响应带 `cache-control: no-store`；
+8. **登录请求体超 16 KiB → 413**（路由级 `bodyLimit`，修复前 2~5 MiB 会被完整解析后才拒绝）；
+9. 正常登录 200，响应体、响应头与 Cookie 中均无上游 credential，上游自己的 `Set-Cookie` 不被透传；
+10. 登录后签发独立的新 CSRF，预登录 Token 不复用；
+11. `GET /webui/bff/auth/session` 暴露上游 capabilities（前端 `canWrite` 的判定依据），且不含 credential；
+12. 诊断接口返回 `requestSource`，在 `WEBUI_TRUST_PROXY` 配置正确时 `remoteTrusted=true` 且 `clientIp` 取自 `X-Forwarded-For`——这是"反代地址配错只会静默降级限流"的唯一可见信号；
+13. 诊断版本号取自 `apps/bff/package.json`（不是硬编码，也不是 `unknown`）；
+14. SPA 首页 200 + `no-cache`，`assets/*.js` 的 `.map` 请求 404；
+15. `Accept-Encoding: br` 命中预压缩产物且体积显著小于 identity；
+16. 允许清单外路由 404、路径穿越 400、被删除的 `session-summary` 影子端点 404；
+17. query 净化边界：`?query=nginx/1.2.3` 放行并真的触达上游，`?query=../../etc/passwd` 被 400 拒绝；
+18. BFF 日志中不出现上游 credential。
+
+> 注：脚本用 `node:http` 而非 `fetch` 发送请求——`Host` 是 forbidden header，`fetch` 无法设置，会被 `assertHost` 一律挡成 421。
 
 ### 3.4 前端与允许清单一致性（`pnpm check:frontend-paths`）
 
-扫描前端源码中出现的每个上游管理路径，与冻结允许清单逐条比对：**76 条模板 vs 55 条前端路径，全部命中**，不存在“页面调用了未开放接口”的运行时 404 风险。
+扫描前端源码中出现的每个上游管理路径，与冻结允许清单逐条比对：**76 条模板 vs 56 条前端路径，全部命中**，不存在“页面调用了未开放接口”的运行时 404 风险。
 
 ### 3.5 验证过程中发现并修复的真实缺陷
 
 1. **上游丢弃响应体时的未捕获异常（可达拒绝服务）**：`upstream/client.ts` 在"拒绝跟随重定向"和"响应超体积"两条安全路径上直接调用 `response.body.destroy()`，undici 会因此抛出 AbortError，无人监听时成为进程级 uncaught exception —— 即上游返回 3xx 或超大响应就能让 BFF 崩溃。已改为先挂 `error` 监听再销毁（`discardResponseBody()`），状态码与安全语义不变。
 2. **缓存策略被插件覆盖**：`@fastify/static` 自带的 `Cache-Control` 计算覆盖了自定义 `setHeaders`，导致 `index.html` 变成 `public, max-age=0`、带 hash 的资源也没有 `immutable`。已在该插件注册时关闭 `cacheControl`，由自有策略决定（缺陷由本次冒烟测试发现，已复测通过）。
+3. **畸形 JSON 被映射成 500**：`server.ts` 的错误处理器只列了 `FST_ERR_CTP_EMPTY_JSON_BODY` 与 `FST_ERR_VALIDATION`，漏了 Fastify 5 的 `FST_ERR_CTP_INVALID_JSON_BODY`（其 `statusCode` 为 400），导致任何未认证客户端发一段语法错误的 JSON 就能拿到 500 并写入 `level: error` 日志。已补映射并由 `test/fixes.test.ts` 与生产模式冒烟双重覆盖。
+4. **会话绝对 8 小时上限被滑动重置**：`session-store.ts` 在刷新上游会话摘要时用 `now + sessionMaxSeconds` 重算 `absoluteExpiresAt`，而非以 `createdAt` 为锚，导致持续活跃的会话永不到期（实测 7 小时后刷新一次，绝对期限从 T+8h 变成 T+15h）。已改为 `min(createdAt + max, 上游 expiresAt)`。
+5. **query 净化的正则误伤合法参数**：原先只要 query 值里出现 `..`、`//`、`\` 或 `http:` 子串就拒绝，导致日志检索里的 `a..b`、URL 形态的关键字全部 400；而对真正的穿越又拦得不够精确。已改为只拦"真正的相对路径形状"（`../`、`..\`、整值 `..`），并补单值长度上限与控制字符检查。
+6. **`/stats/models/{modelId:path}` 的斜杠模型不可达**：上游该路由用 Starlette 的 `:path` 转换器（模型 id 可含 `/`，如 `provider/model-a`），但 OpenAPI 快照无法表达该语义，BFF 逐段匹配后把编码斜杠拒了。已对这条路由单独实现"剩余段拼成一个参数"的匹配与重编码，前端新增 `encodePathSegments()`。
+7. **登录路由没有路由级 body 上限**：全局 `bodyLimit` 是 5 MiB（为 OAuth 导入准备），而登录体只需几百字节；2~5 MiB 的登录请求会被完整解析后才被运行期检查拒绝，在只读根文件系统的容器里构成内存放大点。已给 `/webui/bff/auth/login` 单独设 16 KiB。
+8. **sourcemap 随镜像发布**：`vite.config.ts` 的 `sourcemap: true` + `tsconfig.base.json` 的 `sourceMap: true` 让 `dist` 里带上 7.28 MB 的 `.js.map`，而静态托管又给 `assets/*` 打上一年期 `immutable` 缓存——等于把完整前端源码（含 `sourcesContent`）长期公开提供。已关闭两处 sourcemap、给 BFF 的构建加产物清理、静态托管对 `.map` 加 `allowedPath` 拦截、`.dockerignore` 加 `**/*.map`、Dockerfile 加产物断言。
+9. **无预压缩、无代码分割**：主 JS 单文件 1.62 MB 且反代与 BFF 都不做压缩，首屏实际传输 1.62 MB。已按依赖族拆包 + 路由级懒加载（主入口降到 40 kB 量级），并新增 `scripts/precompress-dist.mjs` 在构建期生成 `.br`/`.gz` 兄弟文件，由 `@fastify/static` 的 `preCompressed` 协商返回。
 
 ## 4. 未完成（明确不在本版范围）
 

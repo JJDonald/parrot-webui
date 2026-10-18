@@ -37,6 +37,14 @@ parrot.example.com {
 
 	# 3) 其余 /webui/ 保留前缀转发到独立 WebUI 容器（仅宿主回环 127.0.0.1:3000）
 	handle /webui/* {
+		# 请求体上限：与 deploy/nginx-webui.conf 的 client_max_body_size 5m 对齐。
+		# 注意 Caddy 的 request_body 指令需要 v2.10+；旧版本请保持下面这行注释，
+		# 此时唯一的上限是 BFF 自己的 bodyLimit（默认 1 MiB、OAuth 导入 5 MiB、登录 16 KiB），
+		# 也就是说超大请求会先被完整送进容器再由 BFF 拒绝——不如入口层直接切断。
+		# request_body {
+		# 	max_size 5MB
+		# }
+
 		reverse_proxy 127.0.0.1:3000 {
 			# 默认即原样传递 Host；这里显式写出，避免被上游约定误改
 			header_up Host {host}

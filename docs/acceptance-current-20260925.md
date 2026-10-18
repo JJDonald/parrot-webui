@@ -1,5 +1,7 @@
 # 当前工作区验收报告（2026-09-25）
 
+> **历史记录，非当前状态。** 本报告固定的是提交 `41c17f4` 加当轮未提交改动的快照，其后仓库已引入大量修复（详见 `docs/acceptance.md` §3.5）。其中"前端主包 1,624.25 kB"与"80 个测试"两项已过期：当前主入口 chunk 为 40 kB 量级（已按依赖族拆包 + 路由级懒加载 + 预压缩），测试总数为 116 例。其余结论（容器加固、临时容器健康、预登录 Cookie 属性）当时为真，本报告未复验。
+
 ## 结论
 
 本地工程与容器基础验收通过；完整业务验收待完成。本轮执行的检查未发现阻断构建、测试或容器启动的缺陷，不能据此认定全部页面和真实业务流程已经验收通过。
@@ -42,3 +44,12 @@
 - **当前构建的线上验收**：未部署当前代码，未复验真实 HTTPS Cookie 行为、反向代理、公网端口封闭及与现有业务路由的兼容性。生产 Cookie 检查仅为响应属性核验。
 
 本轮临时容器将在完成检查后清理；保留 `parrot-webui:acceptance` 镜像用于复查。历史真机部署记录不作为本轮当前构建已上线的证据。
+
+## 本轮四个问题的后续处理状态
+
+> 以下是后续修复轮补记的状态，不属于 2026-09-25 本轮实测结论。
+
+1. **静态检查缺失 → 已修复**：新增 `scripts/lint.mjs`，根 `pnpm lint` 与四个子包的 `lint` 均改为真实检查。规则不是风格偏好，而是评审确认过的底线：前端禁止 `dangerouslySetInnerHTML`/`.innerHTML =`/`eval(`/`new Function(`；前后端禁止 `as any`/`@ts-ignore`/`@ts-nocheck`/`@ts-expect-error`；业务代码禁止 `localStorage`/`sessionStorage`/`document.cookie`（仅主题名豁免）；BFF 禁止裸 `console.*`（必须走已脱敏的 fastify logger）；构建产物不得含 `*.map`。因无 ESLint 依赖（离线交付），用脚本实现，覆盖 57 个前端源文件与 18 个 BFF 源文件。
+2. **前端主包偏大 → 已修复**：`vite.config.ts` 按依赖族 `manualChunks` 拆包（`vendor-antd`/`vendor-react`/`vendor-icons`/`vendor-query`/`vendor-dayjs`/`vendor`）并对 11 个页面做路由级 `React.lazy` 懒加载。主入口降到 40 kB 量级，首访按需加载页面 chunk；单块最大的是 `vendor-antd` 907 kB（第三方库整体，未再细分）。
+3. **pnpm 冗余配置告警 → 已修复**：已从根 `package.json` 删除被 pnpm 12 忽略的 `pnpm.onlyBuiltDependencies` 字段（`pnpm-workspace.yaml` 的 `allowBuilds` 是生效配置）。删除后 `pnpm install --frozen-lockfile` 复跑：`Scope: all 5 workspace projects`、`Lockfile is up to date`、退出码 0，且不再出现该 WARN。
+4. **验收文档状态不一致 → 已修复**：`docs/acceptance.md` 的测试总数改为"最新 116 例（BFF 78、Web 30、E2E 8），历史基线 81"，并逐条补记本轮新增的传输层 14 例与修复项回归 21 例；冒烟数字改为 18/18 并新增生产态 31/31；前端路径改为 56 条；`README.md` 的 Node 版本口径、导航形态、测试数量同步更正；`docs/compatibility.md` 的 AboutPage 占位断言与 ready 语义（上游不可达仍 200）已按实现更正。

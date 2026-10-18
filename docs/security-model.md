@@ -17,7 +17,8 @@
 - **`.env` / Compose 里不得设置共享管理密钥**（任何形如 `PARROT_ADMIN_KEY` / `WEBUI_ADMIN_KEY` 的变量都是错误做法）。
   BFF 的配置加载（`apps/bff/src/config.ts`）**不读取**任何密钥类变量；它只读地址、时长、限流等参数。
 - 上游 credential 只在 `apps/bff/src/upstream/client.ts` 里以 `Authorization: Bearer <credential>` 注入，
-  并且 `maxRedirections: 0`（不跟随重定向，避免把 Authorization 带到别的主机）。
+  并且**不跟随重定向**：undici 的 `request()` 默认不跟随，代码另外把任何 3xx 响应显式转成
+  `WEBUI_UPSTREAM_REDIRECT_BLOCKED`（502），避免把 Authorization 带到别的主机。
 - 浏览器侧只有不透明 Cookie；Cookie 值不是上游 credential。
 
 ## 2. 浏览器请求校验（Origin / CSRF / Host / Fetch Metadata）
@@ -35,7 +36,10 @@
   登录后重新签发（预登录 Token 与登录后 Token 是两套）。
 - **Content-Type**：写请求只接受 `application/json`（或空），其他类型直接 415，避免把任意内容转发给上游。
 - **CORS**：不开放跨域，不返回 `Access-Control-Allow-Origin: *`；同源前端与 BFF 共用 `/webui/` 路径。
-- **无 CSRF 的例外**：无。包括登录、登出、OAuth 轮询 POST。
+- **无 CSRF 的例外**：只有一个——`POST /webui/bff/auth/logout` 在**没有本地会话**时直接清 Cookie 并返回
+  `{localSessionDestroyed: true, upstreamRevocation: "not-attempted"}`。该分支不产生任何状态变更
+  （会话本来就不存在，Cookie 反正会被清），因此没有可被 CSRF 触发的副作用；一旦有本地会话，
+  登出照常校验 `X-CSRF-Token`。其他写请求（登录、OAuth 轮询 POST 等）全部要求 CSRF。
 
 ## 3. 固定目标与路由允许清单
 
@@ -73,6 +77,12 @@
   **不要**通过伪造来源头绕过上游限流。
 - 如果 `WEBUI_TRUST_PROXY` 配错（例如全部用户被识别成同一个代理地址），来源限流会退化成共享桶；
   验收时要确认两个不同客户端的限流键不同（见 [deployment.md](./deployment.md) 第 5 节）。
+  登录后的「版本与诊断」页面会直接显示 `requestSource`：`remoteAddress`（BFF 看到的直连对端）、
+  `remoteTrusted`（是否命中 `WEBUI_TRUST_PROXY`）、`clientIp`（最终用于限流的键）与 `warning`
+  （不可信时给出明确提示），不用猜。
+- 限流容器是有界的（`apps/bff/src/security/rate-limit.ts`，默认 4096 个键）：
+  超出后按最旧窗口淘汰，但全局限流器使用的常量键 `global` 被固定为**不可淘汰**，
+  否则攻击者用轮换来源（例如 IPv6 /64）把表刷满就能把全局计数挤掉。
 
 ## 5. 脱敏日志
 

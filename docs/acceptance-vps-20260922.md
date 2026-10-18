@@ -1,4 +1,4 @@
-# 真机部署与验收记录：海外 VPS（2026-09-22）
+# 真机部署与验收记录：海外 VPS机（2026-09-22）
 
 本文件是 [`docs/acceptance.md`](./acceptance.md) §5「未验证（必须现场确认）」的现场兑现记录。
 每条结论后面都跟着实际执行过的命令与真实输出；未执行的事项明确标注「未验证」。
@@ -7,7 +7,7 @@
 
 | 项目 | 实测值 | 来源 |
 | --- | --- | --- |
-| 主机 | `203.0.113.10`（海外 VPS） | 登录后 `hostname` = `redacted-host-uuid` |
+| 主机 | `203.0.113.10`（海外 VPS） | 登录后 `hostname` = `<已脱敏的主机 UUID>` |
 | 系统 | Debian GNU/Linux 12 (bookworm)，kernel 6.1.0-52-amd64，x86_64 | `/etc/os-release`、`uname -a` |
 | 资源 | 2 vCPU / 1966 MB RAM / 50 GB（部署前已用 16 GB） | `nproc`、`free -m`、`df -h` |
 | 容器运行时 | Docker 28.5.1、Docker Compose v5.0.0 | `docker --version` |
@@ -275,7 +275,7 @@ c765e3d977059b0abdbd5a8e588d020e     # mtime 仍是 Sep 2，与部署前一致
 | `https://parrot.example.com/v1/models` | 401（未认证，符合原行为） |
 | `https://parrot.example.com/api/management/v1/meta` | 401 |
 | `https://site-a.example.com/` | 302（该站点自身行为） |
-| `https://other-app.example.com/` | 307（该站点自身行为） |
+| `https://site-b.example.com/` | 307（该站点自身行为） |
 
 ### 4.7 真实浏览器（acceptance.md §5.7 兑现）
 
@@ -391,7 +391,25 @@ docker network disconnect parrot-webui-ingress npm && docker network rm parrot-w
 | --- | --- |
 | 构建方式 | 开发机 `docker build --no-cache --progress=plain -t parrot-webui:local .`（仍执行 `pnpm contracts:generate --check`，输出 `[build] contracts routes ok: 76`） |
 | 镜像 | `parrot-webui:local`，574 MB，构建机镜像 ID `4902290eb10f` |
-| 传输 | `docker save \| gzip -1` → 102 MB，`sha256 d4b2d94df4243d888a2fb15cc1fa3cc4bcef12233fa627860c00b4286c7557aa`，两端校验一致；scp 15.8 s |
+| 传输 | `docker save \| gzip -1` → 102 MB，`sha256 d4b2d94df4243d888a2fb15cc1fa3cc4bcef12233fa627860c00b4286c7557aa`，两端校验一致；scp 用时正常 |
 | 目标机镜像 ID | `sha256:c59861d7b111054f9ff7c0137c51d4cb924f956b3cb44c8ef65e739292988047`（与容器 `docker inspect .Image` 一致，旧镜像已 `docker rmi` 清理） |
 | 前端产物 | `/webui/assets/index-BuzoPGLR.js`（构建包内可检索到本次修复的标识 `adoptCsrf`、`suppressSessionLost`，证明修复确实进入交付物） |
 | 上线后复验 | `/webui` 308、`/webui/` 200、`/webui/models` 深链接 200、`/webui/health/live` 404、`/v1/models` 401（无回归）；真实密钥登录 200 并读回真实数据；浏览器端提交实测为 `bootstrap 200 → POST /webui/bff/auth/login 401`，错误归因正确 |
+
+> **已脱敏**：本文件原为现场记录，为避免公开仓库泄露真实基础设施信息，
+> 已将真实公网 IP、真实域名、真实内网网段、主机标识、同机其它站点名与宿主机
+> 绝对路径替换为文档保留值或占位名（IP 用 RFC 5737 的 `203.0.113.0/24`，域名用
+> RFC 2606 的 `example.com`，第三方服务名用 `other-app` / `other-svc`，绝对路径用
+> `<deploy-dir>` / `<npm-data-dir>`）。
+> 端口 `22122` 与 `/data/nginx/...`（容器内路径）保留原样：前者是上游 Parrot
+> 自身 compose 文件的默认端口，后者是镜像内部路径，都不构成站点特有信息。
+> 所有命令、输出与结论均保持原样，仅标识符被替换。
+
+> **注意**：脱敏只覆盖本文件的工作区版本。该文件此前已进入 git 历史并推送到
+> 公开远端，历史提交中仍是原始内容。历史重写与否见 `docs/remediation.md`
+> 的待决策项。
+
+> **注意**：脱敏只覆盖本文件的工作区版本。该文件此前已进入 git 历史并推送到
+> 公开远端，历史提交中仍是原始内容。历史重写与否见 `docs/remediation.md`
+> 的待决策项。
+

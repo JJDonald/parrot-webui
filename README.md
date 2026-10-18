@@ -49,17 +49,27 @@ compose.yaml               独立 Compose 项目 parrot-webui（默认只发布 
 
 ## 本机开发
 
-前置：Node 24、pnpm（`packageManager` 已锁定 `pnpm@12.5.1`）。
+前置：Node 22 或更高（`package.json` 的 `engines` 要求 `>=22`；Dockerfile 用 Node 24 构建）、
+pnpm（`packageManager` 已锁定 `pnpm@12.5.1`）。
 
 ```bash
 pnpm install             # 安装依赖（CI/交付请用 pnpm install --frozen-lockfile）
 pnpm contracts:generate  # 校验上游快照 + 生成冻结路由表与类型
+pnpm contracts:verify    # 校验生成物与允许清单/快照完全同步（防"改了清单忘重新生成"）
+pnpm check:frontend-paths # 校验前端调用的每个管理路径都在允许清单内
 pnpm dev                 # 并行启动 BFF(3000) 与 Vite(5173)，Vite 把 /webui/bff 与 /webui/health 代理到 BFF
 pnpm typecheck           # 全仓类型检查
-pnpm lint                # 静态检查（当前为占位实现）
+pnpm lint                # 静态检查（scripts/lint.mjs：XSS 面、类型压制、越界存储、裸日志、产物 sourcemap）
 pnpm test                # 单元/契约测试（vitest）
 pnpm test:e2e            # 端到端/集成测试（@parrot-webui/e2e，vitest）
-pnpm build               # 构建 contracts → web(apps/web/dist) → bff(apps/bff/dist)
+pnpm build               # 构建 contracts → web(apps/web/dist) → 预压缩(.br/.gz) → bff(apps/bff/dist)
+```
+
+构建完成后可对**真实产物**做两轮冒烟（都需要先 `pnpm build`）：
+
+```bash
+pnpm --filter @parrot-webui/e2e test:smoke       # 18 项：development 形态（SPA、缓存、深链接、Host/Origin）
+pnpm --filter @parrot-webui/e2e test:smoke:prod  # 31 项：production 形态（__Secure- Cookie、HSTS、.map 404、预压缩）
 ```
 
 开发模式注意事项：
@@ -81,7 +91,8 @@ docker compose logs -f webui
 ```
 
 镜像细节：多阶段构建；构建阶段用 `--frozen-lockfile` 安装依赖、执行 `pnpm contracts:generate --check`
-（校验快照哈希与 76 条允许清单）、构建 web 与 bff；运行阶段只含生产依赖 + 静态产物（`apps/web/dist`）
+（校验快照哈希与 76 条允许清单）、`pnpm contracts:verify`（校验生成物零漂移）、构建 web（并生成 `.br`/`.gz` 预压缩）
+与 bff，最后断言产物中不存在 `*.map`；运行阶段只含生产依赖 + 静态产物（`apps/web/dist`）
 + BFF 产物（`apps/bff/dist`），以非 root 用户 `node` 运行，只读根文件系统 + `tmpfs /tmp`，
 `cap_drop: ALL` + `no-new-privileges`，健康检查用 `/webui/health/live`，支持 SIGTERM 优雅退出。
 不安装 Docker socket、不挂载原 Parrot 数据目录。
@@ -122,7 +133,8 @@ https://<原Parrot域名>/webui/
 | [docs/contracts.md](docs/contracts.md) | 上游快照生成/校验、基线提交与哈希、允许清单冻结与扩展、禁止改快照 |
 | [docs/frontend-contract.md](docs/frontend-contract.md) | 前端与 BFF 的共享接口约定（页面开发者必读） |
 | [docs/acceptance.md](docs/acceptance.md) | 验收记录：已完成 / 未完成 / 未验证、每条命令的真实输出、验证中发现并修复的缺陷 |
-| [docs/acceptance-vps-20260922.md](docs/acceptance-vps-20260922.md) | 真机部署与验收记录（海外 VPS）：现场事实、方案 B 适配、逐条验收的真实输出、回滚与运维注意 |
+| [docs/remediation.md](docs/remediation.md) | 评审问题修复清单：每个编号的原始缺陷、修复位置、验证方式，以及仍需决策/无法在本机验证的项 |
+| [docs/acceptance-vps-20260922.md](docs/acceptance-vps-20260922.md) | 真机部署与验收记录（海外 VPS）：现场事实、方案 B 适配、逐条验收的真实输出、回滚与运维注意。**该文件已脱敏**（公网 IP/域名/内网段替换为文档保留值），但历史提交里仍可能残留原始标识 |
 
 ## 已完成 / 未完成 / 未验证
 
@@ -130,7 +142,7 @@ https://<原Parrot域名>/webui/
 
 实时运行页使用 Parrot 的运行状态、并发、冷却与最近请求接口，每 15 秒刷新；用量分析页使用统计汇总、分组和模型统计接口，支持周期、维度、排序与模型明细。Parrot 当前管理契约没有 Keeper 的 SQLite 时序、社区排行、配额历史与刷新接口，因此不提供这些数据视图，也不推算货币金额或虚构趋势线。
 
-**本次验证**：Web 类型检查、构建、29 个前端测试、8 个管理流程测试与前端路径检查通过；构建产物冒烟检查 15/15 通过。构建仍提示主 JavaScript chunk 超过 1200 kB。
+**本次验证**：Web 类型检查、构建、30 个前端测试、8 个管理流程测试与前端路径检查通过；`pnpm test` 合计 116 例全绿（BFF 78 + Web 30 + E2E 8）。构建产物冒烟检查 18/18 通过，**生产模式冒烟检查 31/31 通过**（`NODE_ENV=production` 下的 `__Secure-` Cookie、HSTS 与全部安全头，此前无任何自动化覆盖）。前端已按依赖族拆包（vendor-antd / vendor-react / vendor-query / vendor-icons / vendor-dayjs）并对每个页面做路由级懒加载，主入口 chunk 已降到 40 kB 量级；构建仍提示 `vendor-antd` 单个 chunk 约 907 kB（第三方 UI 库整体，未再细分）。构建期会为静态产物生成 `.br`/`.gz` 预压缩兄弟文件，由 BFF 直接协商返回。BFF 单元测试包含畸形 JSON、健康检查语义、生产模式 Cookie/安全头、`.map` 拒绝与 Brotli/Gzip 协商等新用例。`pnpm lint` 不再是占位（`scripts/lint.mjs`）：检查 XSS 面、类型压制、越界存储、裸日志与产物 sourcemap。
 
 **未完成**：Telegram 批准登录、真实供应商 OAuth 之外的登录方式、高级模型元数据、负载均衡、网络诊断、MCP/搜索、多媒体日志、更新/重启类操作（见 acceptance.md §4）。
 

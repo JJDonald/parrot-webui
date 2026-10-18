@@ -35,17 +35,19 @@
 - `GET /webui/health/ready` 也给出最小上游状态（`upstream.reachable`、`upstream.managementApiDetected`），
   不含任何凭据或内部地址，且不对公网转发。
 
-> 未完成/待确认：前端的「版本与诊断」页面目前只是占位组件
-> （`apps/web/src/features/about/AboutPage.tsx` 只渲染"尚未实现"），
-> 所以上面 1.2/1.3 的信息现在需要直接用 curl（配合已登录 Cookie）或浏览器网络面板查看。
-> 页面上线后应能直接展示。是否要为本版补齐该页面由主流程决定。
+> 已实现：前端的「版本与诊断」页面（`apps/web/src/features/about/AboutPage.tsx`）会调用
+> `GET /webui/bff/diagnostics` 并直接展示上述 1.2/1.3 的信息（含 `requestSource`：
+> 直连地址、是否可信、最终解析出的客户端 IP，用于核对 `WEBUI_TRUST_PROXY` 是否配对）。
+> 用 curl 排查仍然可用，但不是必须。
 
 ## 2. 缺少管理 API 时的表现
 
 - **上游不可达**：`/webui/health/live` 仍然 200（进程存活，容器不会因此重启循环）；
-  `/webui/health/ready` 返回 503 / `not-ready`，并给出 `upstream.reachable=false`。
-  登录页提示连接失败（例如 `WEBUI_UPSTREAM_UNREACHABLE`），并给出上游侧错误码；**不会**退回演示数据，
-  也不会显示"成功"。
+  `/webui/health/ready` **同样返回 200**，因为就绪判据是"静态前端产物已就位"，
+  上游状态只作为信息字段给出（`upstream.reachable=false`、`upstream.managementApiDetected=false`）。
+  这样上游短暂抖动不会让编排系统把 WebUI 容器摘掉/重启；真正的连接失败由登录页与业务请求暴露。
+- **静态产物缺失**（构建或挂载出问题）：`/webui/health/ready` 返回 503 / `not-ready`
+  （`staticAssetsPresent=false`），SPA 页面返回 `WEBUI_NOT_READY`。
 - **上游存在但没有管理 API**：`managementApiDetected=false`；登录会失败在换票这一步，
   页面提示这是传输/兼容问题而不是密码错误（错误码区分 `WEBUI_*` 与上游业务错误）。
 - **上游版本过新/过旧导致个别接口不存在**：BFF 不会把它伪装成 200；未在白名单中的路径会被 404
