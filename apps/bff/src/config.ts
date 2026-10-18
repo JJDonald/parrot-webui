@@ -7,7 +7,20 @@
  * - 本文件不读取任何管理密钥；管理主密钥只在登录请求内短暂存在。
  */
 
+import { fileURLToPath } from 'node:url';
+
 export const FIXED_BASE_PATH = '/webui/';
+
+/**
+ * 前端构建产物的默认目录（apps/web/dist）。
+ *
+ * 用 fileURLToPath 而不是 `new URL(...).pathname`：后者不做百分号解码、
+ * 且在 Windows 上会产出 `/F:/workspace/...` 这种带前导斜杠的路径，
+ * 导致 existsSync 失败、静态资源整体 503。
+ */
+function defaultStaticDir(): string {
+  return fileURLToPath(new URL('../../web/dist', import.meta.url));
+}
 
 export interface WebuiConfig {
   readonly nodeEnv: string;
@@ -206,7 +219,9 @@ export function loadConfig(env: Env = process.env): WebuiConfig {
     maxConcurrentLogin: readInt(env, 'WEBUI_MAX_CONCURRENT_LOGIN', 4, 1, 100),
     maxConcurrentBootstrap: readInt(env, 'WEBUI_MAX_CONCURRENT_BOOTSTRAP', 8, 1, 200),
     logLevel: readString(env, 'LOG_LEVEL', 'info'),
-    staticDir: readString(env, 'WEBUI_STATIC_DIR', new URL('../../web/dist', import.meta.url).pathname),
+    // 必须用 fileURLToPath 而不是 URL.pathname：后者在 Windows 上会得到
+    // `/F:/workspace/...` 这种带前导斜杠的伪路径，静态资源会全部找不到。
+    staticDir: readString(env, 'WEBUI_STATIC_DIR', defaultStaticDir()),
     cookieSecure,
     cookiePrefix,
     exposeUpstreamOrigin: readBool(env, 'WEBUI_DIAGNOSTICS_EXPOSE_UPSTREAM', false),

@@ -115,7 +115,7 @@ function defaultMessage(code: WebuiErrorCode): string {
     case 'WEBUI_UPSTREAM_UNREACHABLE':
       return '无法连接本机 Parrot 管理 API';
     case 'WEBUI_UPSTREAM_TIMEOUT':
-      return '等待 Parrot 管理 API 响应超时；写操作结果未知，请刷新确认';
+      return '等待 Parrot 管理 API 响应超时；若为写操作则结果未知，请刷新确认';
     case 'WEBUI_UPSTREAM_UNEXPECTED_CONTENT':
       return 'Parrot 返回了非 JSON 内容，已被 WebUI 转换为结构化错误';
     case 'WEBUI_UPSTREAM_REDIRECT_BLOCKED':

@@ -4,7 +4,7 @@
 
 import type { WebuiConfig } from './config.js';
 import { SessionStore } from './auth/session-store.js';
-import { ConcurrencyGate, SlidingWindowRateLimiter } from './security/rate-limit.js';
+import { ConcurrencyGate, FixedWindowRateLimiter } from './security/rate-limit.js';
 import { UpstreamClient } from './upstream/client.js';
 import { UPSTREAM_CONTRACT_SOURCE } from '@parrot-webui/contracts/routes';
 
@@ -13,10 +13,10 @@ export interface AppContext {
   readonly store: SessionStore;
   readonly upstream: UpstreamClient;
   readonly limiters: {
-    readonly loginPerSource: SlidingWindowRateLimiter;
-    readonly loginGlobal: SlidingWindowRateLimiter;
-    readonly bootstrapPerSource: SlidingWindowRateLimiter;
-    readonly bootstrapGlobal: SlidingWindowRateLimiter;
+    readonly loginPerSource: FixedWindowRateLimiter;
+    readonly loginGlobal: FixedWindowRateLimiter;
+    readonly bootstrapPerSource: FixedWindowRateLimiter;
+    readonly bootstrapGlobal: FixedWindowRateLimiter;
   };
   readonly gates: {
     readonly login: ConcurrencyGate;
@@ -36,15 +36,21 @@ export function createContext(config: WebuiConfig, options: { staticAssetsPresen
     store: new SessionStore(config),
     upstream,
     limiters: {
-      loginPerSource: new SlidingWindowRateLimiter({ limit: config.loginPerSourcePerMinute, windowMs: oneMinute }),
-      loginGlobal: new SlidingWindowRateLimiter({ limit: config.loginGlobalPerMinute, windowMs: oneMinute }),
-      bootstrapPerSource: new SlidingWindowRateLimiter({
+      loginPerSource: new FixedWindowRateLimiter({ limit: config.loginPerSourcePerMinute, windowMs: oneMinute }),
+      // 全局限流用常量键 'global'：固定键，不允许被容量淘汰挤掉（否则轮换来源可绕过全局限制）
+      loginGlobal: new FixedWindowRateLimiter({
+        limit: config.loginGlobalPerMinute,
+        windowMs: oneMinute,
+        pinnedKeys: ['global'],
+      }),
+      bootstrapPerSource: new FixedWindowRateLimiter({
         limit: config.bootstrapPerSourcePerMinute,
         windowMs: oneMinute,
       }),
-      bootstrapGlobal: new SlidingWindowRateLimiter({
+      bootstrapGlobal: new FixedWindowRateLimiter({
         limit: config.bootstrapGlobalPerMinute,
         windowMs: oneMinute,
+        pinnedKeys: ['global'],
       }),
     },
     gates: {

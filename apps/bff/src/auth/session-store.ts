@@ -196,7 +196,10 @@ export class SessionStore {
     const absolute = parseTime(summary.expiresAt);
     if (absolute !== null) {
       session.upstreamAbsoluteExpiresAt = absolute;
-      session.absoluteExpiresAt = Math.min(now + this.config.sessionMaxSeconds * 1000, absolute);
+      // 本地绝对期限必须锚定在"会话创建时刻"，不能用 now：
+      // 否则每次上游刷新都会把 8 小时上限往后推，WEBUI_SESSION_MAX_SECONDS 形同虚设。
+      const localAbsolute = session.createdAt + this.config.sessionMaxSeconds * 1000;
+      session.absoluteExpiresAt = Math.min(localAbsolute, absolute);
     }
     session.upstreamIdleExpiresAt = parseTime(summary.idleExpiresAt);
   }

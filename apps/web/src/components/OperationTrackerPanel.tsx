@@ -17,8 +17,13 @@ import { JsonBlock, Pill, RelativeTime } from './bits';
 import { EmptyState } from './state';
 
 function progressText(operation: OperationRecord): string {
-  if (operation.progress === null) return '无进度上报';
-  return `${Math.round(operation.progress * 100)}%`;
+  const progress = operation.progress;
+  if (!progress) return '无进度上报';
+  // 上游给的是 current/total 计数（不是 0..1 小数），只按计数显示，
+  // 并在 total 异常时退化为纯计数，绝不凭空算出百分比。
+  const percent = Math.round((progress.current / progress.total) * 100);
+  const label = `${progress.current}/${progress.total}`;
+  return Number.isFinite(percent) ? `${label}（${Math.min(100, Math.max(0, percent))}%）` : label;
 }
 
 function OperationRow({ operation }: { operation: OperationRecord }) {

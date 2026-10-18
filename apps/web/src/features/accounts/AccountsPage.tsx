@@ -523,7 +523,8 @@ export function AccountsPage() {
                   setPage(nextPage);
                   setPageSize(nextPageSize);
                 },
-                showTotal: (total) => `共 ${total} 个账号`,
+                showTotal:
+                  meta.total === null ? undefined : (total) => `共 ${total} 个账号（服务端计数）`,
               }}
             />
           </div>

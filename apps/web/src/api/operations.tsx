@@ -13,11 +13,21 @@ import { ApiError, encodeSegment, managementRequest } from './client';
 import { useAuth } from '@/app/AuthProvider';
 export type OperationStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'unavailable';
 
+/**
+ * 上游 `OperationProgressData`（schemas/operations.py）：`{ current, total, messageCode }`。
+ * 注意它不是 0..1 的小数——不要直接乘 100。
+ */
+export interface OperationProgress {
+  current: number;
+  total: number;
+  messageCode: string;
+}
+
 export interface OperationRecord {
   id: string;
   kind: string | null;
   status: OperationStatus;
-  progress: number | null;
+  progress: OperationProgress | null;
   cancellable: boolean;
   createdAt: string | null;
   startedAt: string | null;
@@ -53,7 +63,9 @@ function normalizeStatus(raw: unknown): OperationStatus {
     case 'cancelled':
       return value;
     default:
-      return 'running';
+      // 未知/缺失状态一律视为不可用：伪造 'running' 会让面板对一条永远不会有结果的
+      // 任务无限轮询下去（POLL_SEQUENCE 无限重排），也无法被用户清理。
+      return 'unavailable';
   }
 }
 
@@ -66,6 +78,24 @@ function detectPartial(result: unknown): string | null {
     .find((value) => Array.isArray(value) && value.length > 0) as unknown[] | undefined;
   if (!failures) return null;
   return `任务整体成功，但有 ${failures.length} 项来源未成功；详情见任务结果`;
+}
+
+/**
+ * 解析上游进度对象。上游只在个别 operation 上上报进度，且形状是
+ * `{ current, total, messageCode }`；缺失或字段不合法时返回 null（不要伪造百分比）。
+ */
+function normalizeProgress(raw: unknown): OperationProgress | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const record = raw as Record<string, unknown>;
+  const current = record.current;
+  const total = record.total;
+  if (typeof current !== 'number' || !Number.isFinite(current)) return null;
+  if (typeof total !== 'number' || !Number.isFinite(total) || total <= 0) return null;
+  return {
+    current,
+    total,
+    messageCode: typeof record.messageCode === 'string' ? record.messageCode : '',
+  };
 }
 
 const POLL_SEQUENCE = [1000, 2000, 5000];
@@ -99,7 +129,7 @@ export function OperationProvider({ children }: { children: ReactNode }) {
                   ...operation,
                   kind: typeof data.kind === 'string' ? data.kind : operation.kind,
                   status,
-                  progress: typeof data.progress === 'number' ? data.progress : null,
+                  progress: normalizeProgress(data.progress),
                   cancellable: Boolean(data.cancellable),
                   createdAt: typeof data.createdAt === 'string' ? data.createdAt : operation.createdAt,
                   startedAt: typeof data.startedAt === 'string' ? data.startedAt : operation.startedAt,

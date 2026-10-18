@@ -5,10 +5,11 @@
  * 由 `pnpm contracts:generate` 从 `packages/contracts/upstream.openapi.json`（Parrot v0.33.1）生成。
  * 业务代码不得修改生成文件，也不得臆造字段（实施文档 7.1 / 前端契约 §0）。
  *
- * 为什么用相对路径而不是包名：
- * `@parrot-webui/contracts` 的 package.json exports 指向 `./src/index.ts` 与
- * `./generated/upstream.d.ts`，这两个文件当前都不存在（实际文件名是 `upstream-mvp.d.ts`），
- * 从包名导入会解析失败。为保持本目录外零改动，这里按相对路径转发生成文件里的同名类型。
+ * 为什么从包名导入：`@parrot-webui/contracts` 的 `exports` 里 `./upstream` 直接指向
+ * `./generated/upstream-mvp.d.ts`（纯类型入口，没有运行期代码），因此 `import type`
+ * 既不会打包进任何代码，也不需要跨越 workspace 边界写相对路径。
+ * 早期版本的注释声称"exports 指向不存在的 ./src/index.ts 与 ./generated/upstream.d.ts"，
+ * 与 package.json 事实不符，已更正。
  */
 export type {
   ActionResultData,
@@ -44,4 +45,4 @@ export type {
   ProviderUsageData,
   ProviderUsageMetricData,
   ProviderUsageSnapshotData,
-} from '../../../../../packages/contracts/generated/upstream-mvp';
+} from '@parrot-webui/contracts/upstream';

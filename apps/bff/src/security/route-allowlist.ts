@@ -52,6 +52,19 @@ const AUTH_ROUTES: readonly CompiledRoute[] = FROZEN_UPSTREAM_ROUTES.filter(
   (route) => route.routeClass === 'auth',
 ).map(compileRoute);
 
+/**
+ * 上游用 Starlette 的 `{param:path}` 转换器声明的路由。
+ *
+ * OpenAPI 无法表达 path 转换器，快照里这类参数退化成单段参数（`{modelId}`），
+ * 因此 `provider/model-a` 这种带斜杠的合法取值会被 BFF 单段匹配挡下。
+ * 处理方式：仍然对每一段做与普通路径完全相同的安全校验，只在重拼上游路径时
+ * 保留分段结构——上游路径前缀固定为 `/stats/models/`，逐段拒绝 `.`/`..`/编码斜杠/
+ * 控制字符，所以不可能借助斜杠越界到其他前缀下。
+ */
+const PATH_CONVERTER_ROUTES = new Set<string>(['/api/management/v1/stats/models/{modelId}']);
+/** 上游 `Path(alias="modelId", min_length=1, max_length=256)` 的上限。 */
+const PATH_CONVERTER_MAX_LENGTH = 256;
+
 export function proxyRouteCount(): number {
   return PROXY_ROUTES.length;
 }
@@ -114,18 +127,34 @@ export function matchProxyRoute(method: string, rawPath: string): RouteMatch {
 
   let methodMatched = false;
   for (const compiled of PROXY_ROUTES) {
-    if (compiled.segments.length !== segments.length) continue;
+    const usesPathConverter = PATH_CONVERTER_ROUTES.has(compiled.route.path);
+    if (usesPathConverter ? segments.length < compiled.segments.length : compiled.segments.length !== segments.length) {
+      continue;
+    }
     const params: Record<string, string> = {};
+    // path 转换器参数会吃掉剩余全部分段
+    let consumed: string[] = segments;
     let matched = true;
+    const paramIndex = usesPathConverter ? compiled.segments.length - 1 : -1;
     for (let index = 0; index < compiled.segments.length; index += 1) {
       const template = compiled.segments[index]!;
-      const actual = segments[index]!;
       const paramMatch = PARAM_PATTERN.exec(template);
+      if (index === paramIndex) {
+        const tail = segments.slice(index);
+        const joined = tail.join('/');
+        if (!joined || joined.length > PATH_CONVERTER_MAX_LENGTH) {
+          matched = false;
+          break;
+        }
+        params[paramMatch?.[1] ?? 'modelId'] = joined;
+        consumed = segments.slice(0, index);
+        break;
+      }
       if (paramMatch) {
-        params[paramMatch[1]!] = actual;
+        params[paramMatch[1]!] = segments[index]!;
         continue;
       }
-      if (template !== actual) {
+      if (template !== segments[index]) {
         matched = false;
         break;
       }
@@ -135,7 +164,13 @@ export function matchProxyRoute(method: string, rawPath: string): RouteMatch {
       methodMatched = true;
       continue;
     }
-    const encoded = segments.map((segment) => encodeURIComponent(segment)).join('/');
+    const encoded =
+      paramIndex >= 0
+        ? `${consumed.map((segment) => encodeURIComponent(segment)).join('/')}/${segments
+            .slice(paramIndex)
+            .map((segment) => encodeURIComponent(segment))
+            .join('/')}`
+        : segments.map((segment) => encodeURIComponent(segment)).join('/');
     return {
       route: compiled.route,
       params,
@@ -177,12 +212,22 @@ const DENIED_QUERY_KEYS = new Set([
   'next',
 ]);
 
+/**
+ * 路径穿越形状：`..` 必须构成独立的一段才算越界（`../`、`..\`、`a/../b`、整值 `..`）。
+ * 注意不能简单匹配子串 `..`——日志搜索里的 `a..b`、版本号、文件名都会被误伤，
+ * 而 query 值永远不参与请求目标的拼接（目标 origin 与 path 都是固定的），
+ * 所以真正的越界风险只来自"看起来像一段相对路径"的形状。
+ */
+const TRAVERSAL_PATTERN = /(^|[\\/])\.\.([\\/]|$)/;
+const CONTROL_CHAR_PATTERN = /[\u0000-\u001f\u007f]/;
+const MAX_QUERY_VALUE_LENGTH = 1024;
+
 export function sanitizeUpstreamQuery(rawQuery: string): string {
   if (!rawQuery) return '';
   if (rawQuery.length > 4096) {
     throw new WebuiError('WEBUI_INVALID_REQUEST', { message: 'query 过长' });
   }
-  if (rawQuery.includes('\0') || rawQuery.includes('#')) {
+  if (rawQuery.includes('#') || CONTROL_CHAR_PATTERN.test(rawQuery)) {
     throw new WebuiError('WEBUI_INVALID_REQUEST', { message: 'query 包含非法字符' });
   }
   const params = new URLSearchParams(rawQuery);
@@ -194,9 +239,18 @@ export function sanitizeUpstreamQuery(rawQuery: string): string {
         message: `query 参数 ${key} 不被允许`,
       });
     }
-    if (/(https?:|\/\/|\\|\.\.)/i.test(value)) {
+    // 原始串里不含控制字符不代表解码后没有：%00 / %0a 等编码形式必须一并拒绝
+    if (CONTROL_CHAR_PATTERN.test(key) || CONTROL_CHAR_PATTERN.test(value)) {
+      throw new WebuiError('WEBUI_INVALID_REQUEST', { message: `query 参数 ${key} 包含控制字符` });
+    }
+    if (value.length > MAX_QUERY_VALUE_LENGTH) {
       throw new WebuiError('WEBUI_INVALID_REQUEST', {
-        message: `query 参数 ${key} 包含疑似目标地址或越界内容`,
+        message: `query 参数 ${key} 过长`,
+      });
+    }
+    if (TRAVERSAL_PATTERN.test(value)) {
+      throw new WebuiError('WEBUI_INVALID_REQUEST', {
+        message: `query 参数 ${key} 包含疑似越界路径`,
       });
     }
     forwarded.append(key, value);

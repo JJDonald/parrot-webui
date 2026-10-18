@@ -14,10 +14,8 @@ import { WebuiError } from '../errors.js';
 import { assertCsrf, assertHost, assertJsonContentType, assertOrigin } from '../security/request-guard.js';
 import { matchProxyRoute, sanitizeUpstreamQuery } from '../security/route-allowlist.js';
 import { readSessionCookie, clearSessionCookie } from '../auth/cookies.js';
-import { sessionPayload } from '../auth/controller.js';
 import { approximateBodyBytes, parseByteSize } from '../util/bytes.js';
 import { sanitizeRequestId } from '../util/crypto.js';
-import { UPSTREAM_MANAGEMENT_PREFIX } from '@parrot-webui/contracts/routes';
 
 const PROXY_PREFIX = '/webui/bff/management';
 const FORWARD_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
@@ -40,7 +38,9 @@ function buildForwardHeaders(request: FastifyRequest): Record<string, string> {
   const ifMatch = request.headers['if-match'];
   if (typeof ifMatch === 'string' && ifMatch.trim()) headers['if-match'] = ifMatch.trim();
   const idempotencyKey = request.headers['idempotency-key'];
-  if (typeof idempotencyKey === 'string' && idempotencyKey.trim().length <= 200) {
+  // 上游 dependencies.py 只接受 1..128 字符（超长直接 400 INVALID_REQUEST）。
+  // 这里必须用同一上限，否则 BFF 放行的 129..200 会在上游变成业务错误。
+  if (typeof idempotencyKey === 'string' && idempotencyKey.trim().length >= 1 && idempotencyKey.trim().length <= 128) {
     headers['idempotency-key'] = idempotencyKey.trim();
   }
   headers['x-request-id'] = sanitizeRequestId(request.headers['x-request-id']) ?? String(request.id);
@@ -60,7 +60,12 @@ export function registerManagementProxy(app: FastifyInstance, ctx: AppContext): 
       const token = readSessionCookie(request, ctx.config);
       const session = ctx.store.getSession(token);
       if (!session) {
-        if (token) clearSessionCookie(reply, ctx.config);
+        // 没有 Cookie = 从未登录（REQUIRED）；有 Cookie 但会话已失效 = 过期（EXPIRED）。
+        // 两者都是 401，前端统一转登录，这里区分只为提示文案与排障可读性。
+        if (token) {
+          clearSessionCookie(reply, ctx.config);
+          throw new WebuiError('WEBUI_SESSION_EXPIRED');
+        }
         throw new WebuiError('WEBUI_SESSION_REQUIRED');
       }
 
@@ -97,7 +102,9 @@ export function registerManagementProxy(app: FastifyInstance, ctx: AppContext): 
 
       const upstreamResponse = await ctx.upstream.call({
         method: match.route.method,
-        path: match.upstreamPath.startsWith(UPSTREAM_MANAGEMENT_PREFIX) ? match.upstreamPath : `${UPSTREAM_MANAGEMENT_PREFIX}${match.upstreamPath}`,
+        // matchProxyRoute 已经把参数段重新编码并拼上 /api/management/v1 前缀
+        // （见 security/route-allowlist.ts 里的 upstreamPath 构造），这里直接使用。
+        path: match.upstreamPath,
         query: upstreamQuery,
         headers: buildForwardHeaders(request),
         body,
@@ -144,15 +151,10 @@ export function registerManagementProxy(app: FastifyInstance, ctx: AppContext): 
     },
   });
 
-  // 会话摘要查询用于前端刷新时同步（与 /bff/auth/session 等价，但保持在同一前缀下）
-  app.get(`${PROXY_PREFIX}/session-summary`, async (request, reply) => {
-    assertHost(request, ctx.config);
-    const token = readSessionCookie(request, ctx.config);
-    const session = ctx.store.getSession(token);
-    if (!session) throw new WebuiError('WEBUI_SESSION_REQUIRED');
-    reply.header('cache-control', 'no-store');
-    reply.send({ data: sessionPayload(session), meta: { requestId: String(request.id) } });
-  });
+  // 注：早期版本在这里还有一个 `/session-summary` 影子端点，与 /bff/auth/session 功能重复。
+  // 前端从未调用过它，而且它落在 `/webui/bff/management/*` 通配前缀内、容易让人误以为
+  // "可以绕过允许清单访问任意管理接口的本地路径"，已删除。会话刷新统一走
+  // `GET /webui/bff/auth/session`。
 }
 
 interface ParsedEnvelope {

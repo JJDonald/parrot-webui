@@ -3,9 +3,13 @@
  *
  * 路由与深链接要求（实施文档 9.7）：/webui/channels 等深链接刷新必须返回 SPA；
  * 未登录访问任何管理页面都跳转 /login，而不是域名根下的另一套入口。
+ *
+ * 页面全部按路由懒加载（React.lazy + Suspense）：11 个页面加上全量 antd 曾经
+ * 打进同一个 1.6 MB chunk，首屏必须下载完才能显示任何内容。现在每个页面独立成包，
+ * 首屏只加载登录页/外壳与当前路由。
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { ConfigProvider, App as AntdApp } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
@@ -14,20 +18,36 @@ import { applyThemeAttribute, buildAntdTheme, readStoredTheme, storeTheme, type 
 import { AuthProvider, useAuth } from './AuthProvider';
 import { AppShell } from './AppShell';
 import { OperationProvider } from '@/api/operations';
-import { LoginPage } from '@/features/auth/LoginPage';
-import { OverviewPage } from '@/features/overview/OverviewPage';
-import { AnalysisPage } from '@/features/analysis/AnalysisPage';
-import { RealtimePage } from '@/features/realtime/RealtimePage';
-import { ChannelsPage } from '@/features/channels/ChannelsPage';
-import { AccountsPage } from '@/features/accounts/AccountsPage';
-import { ModelsPage } from '@/features/models/ModelsPage';
-import { ApiKeysPage } from '@/features/api-keys/ApiKeysPage';
-import { LogsPage } from '@/features/logs/LogsPage';
-import { TasksPage } from '@/features/tasks/TasksPage';
-import { AboutPage } from '@/features/about/AboutPage';
-import { NotFoundPage } from '@/features/NotFoundPage';
 import { LoadingBlock } from '@/components/state';
 import { ErrorNotice } from '@/components/feedback';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+
+const LoginPage = lazy(() => import('@/features/auth/LoginPage').then((module) => ({ default: module.LoginPage })));
+const OverviewPage = lazy(() =>
+  import('@/features/overview/OverviewPage').then((module) => ({ default: module.OverviewPage })),
+);
+const AnalysisPage = lazy(() =>
+  import('@/features/analysis/AnalysisPage').then((module) => ({ default: module.AnalysisPage })),
+);
+const RealtimePage = lazy(() =>
+  import('@/features/realtime/RealtimePage').then((module) => ({ default: module.RealtimePage })),
+);
+const ChannelsPage = lazy(() =>
+  import('@/features/channels/ChannelsPage').then((module) => ({ default: module.ChannelsPage })),
+);
+const AccountsPage = lazy(() =>
+  import('@/features/accounts/AccountsPage').then((module) => ({ default: module.AccountsPage })),
+);
+const ModelsPage = lazy(() => import('@/features/models/ModelsPage').then((module) => ({ default: module.ModelsPage })));
+const ApiKeysPage = lazy(() =>
+  import('@/features/api-keys/ApiKeysPage').then((module) => ({ default: module.ApiKeysPage })),
+);
+const LogsPage = lazy(() => import('@/features/logs/LogsPage').then((module) => ({ default: module.LogsPage })));
+const TasksPage = lazy(() => import('@/features/tasks/TasksPage').then((module) => ({ default: module.TasksPage })));
+const AboutPage = lazy(() => import('@/features/about/AboutPage').then((module) => ({ default: module.AboutPage })));
+const NotFoundPage = lazy(() =>
+  import('@/features/NotFoundPage').then((module) => ({ default: module.NotFoundPage })),
+);
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,6 +64,15 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+/** 路由级懒加载的挂起占位：保持整页高度，避免加载时布局跳动。 */
+function RouteFallback() {
+  return (
+    <div style={{ minHeight: '50vh', display: 'grid', placeItems: 'center' }}>
+      <LoadingBlock label="正在加载页面…" />
+    </div>
+  );
+}
 
 function RequireAuth({ theme, onThemeChange }: { theme: ThemeName; onThemeChange: (theme: ThemeName) => void }) {
   const { status, error, refreshBootstrap } = useAuth();
@@ -107,27 +136,57 @@ export function App() {
           <AuthProvider>
             <OperationProvider>
               <BrowserRouter basename="/webui">
-                <Routes>
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route element={<RequireAuth theme={theme} onThemeChange={handleThemeChange} />}>
-                    <Route index element={<OverviewPage />} />
-                    <Route path="analysis" element={<AnalysisPage />} />
-                    <Route path="realtime" element={<RealtimePage />} />
-                    <Route path="channels" element={<ChannelsPage />} />
-                    <Route path="accounts" element={<AccountsPage />} />
-                    <Route path="models" element={<ModelsPage />} />
-                    <Route path="api-keys" element={<ApiKeysPage />} />
-                    <Route path="logs" element={<LogsPage />} />
-                    <Route path="tasks" element={<TasksPage />} />
-                    <Route path="about" element={<AboutPage />} />
-                    <Route path="*" element={<NotFoundPage />} />
-                  </Route>
-                </Routes>
+                {/* 路由边界：某个页面渲染崩溃时只替换内容区，外壳与导航仍可用 */}
+                <ContentErrorBoundary>
+                  <Routes>
+                    <Route
+                      path="/login"
+                      element={
+                        <Suspense fallback={<RouteFallback />}>
+                          <LoginPage />
+                        </Suspense>
+                      }
+                    />
+                    <Route element={<RequireAuth theme={theme} onThemeChange={handleThemeChange} />}>
+                      <Route index element={<LazyPage page="概览" element={<OverviewPage />} />} />
+                      <Route path="analysis" element={<LazyPage page="用量分析" element={<AnalysisPage />} />} />
+                      <Route path="realtime" element={<LazyPage page="实时运行" element={<RealtimePage />} />} />
+                      <Route path="channels" element={<LazyPage page="API 渠道" element={<ChannelsPage />} />} />
+                      <Route path="accounts" element={<LazyPage page="OAuth 账号" element={<AccountsPage />} />} />
+                      <Route path="models" element={<LazyPage page="模型中心" element={<ModelsPage />} />} />
+                      <Route path="api-keys" element={<LazyPage page="下游 API Key" element={<ApiKeysPage />} />} />
+                      <Route path="logs" element={<LazyPage page="请求日志" element={<LogsPage />} />} />
+                      <Route path="tasks" element={<LazyPage page="管理任务" element={<TasksPage />} />} />
+                      <Route path="about" element={<LazyPage page="版本与诊断" element={<AboutPage />} />} />
+                      <Route path="*" element={<LazyPage page="页面" element={<NotFoundPage />} />} />
+                    </Route>
+                  </Routes>
+                </ContentErrorBoundary>
               </BrowserRouter>
             </OperationProvider>
           </AuthProvider>
         </AntdApp>
       </ConfigProvider>
     </QueryClientProvider>
+  );
+}
+
+/** 单个懒加载路由：错误边界按路由路径重置，切页后不再残留上一页的崩溃状态。 */
+function LazyPage({ page, element }: { page: string; element: React.ReactNode }) {
+  const location = useLocation();
+  return (
+    <ErrorBoundary scope={page} resetKey={location.pathname}>
+      <Suspense fallback={<RouteFallback />}>{element}</Suspense>
+    </ErrorBoundary>
+  );
+}
+
+/** 包裹整个路由表：连 RequireAuth / AppShell 崩溃时也有兜底。 */
+function ContentErrorBoundary({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  return (
+    <ErrorBoundary scope="页面" resetKey={location.pathname}>
+      {children}
+    </ErrorBoundary>
   );
 }

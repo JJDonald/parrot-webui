@@ -250,7 +250,21 @@ export function DangerConfirmButton({
 }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState('');
+  const [openFailed, setOpenFailed] = useState(false);
   const locked = Boolean(requiresTyping) && typed !== requiresTyping;
+
+  const handleConfirm = async (): Promise<void> => {
+    // onConfirm 失败时不要把弹窗关掉：调用方负责把错误渲染到页面上，
+    // 这里只把「执行中…」复位，让用户可以重试或取消。
+    try {
+      await onConfirm();
+      setOpen(false);
+      setTyped('');
+      setOpenFailed(false);
+    } catch {
+      setOpenFailed(true);
+    }
+  };
 
   return (
     <>
@@ -268,6 +282,11 @@ export function DangerConfirmButton({
                 目标：<strong>{resourceName}</strong>
               </div>
               <div className="notice-box notice-box--warning">{impact}</div>
+              {openFailed ? (
+                <div className="notice-box notice-box--error">
+                  操作失败，弹窗已保留。请查看页面上的错误提示后重试，或取消。
+                </div>
+              ) : null}
               {requiresTyping ? (
                 <label className="field">
                   <span className="field__label">请输入 {requiresTyping} 以确认</span>
@@ -283,11 +302,7 @@ export function DangerConfirmButton({
                 type="button"
                 className="btn btn--danger"
                 disabled={pending || locked}
-                onClick={async () => {
-                  await onConfirm();
-                  setOpen(false);
-                  setTyped('');
-                }}
+                onClick={handleConfirm}
               >
                 {pending ? '执行中…' : confirmLabel}
               </button>

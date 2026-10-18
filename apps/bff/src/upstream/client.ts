@@ -30,7 +30,6 @@ export interface UpstreamResponse {
   readonly contentType: string;
   readonly upstreamRequestId: string | null;
   readonly retryAfter: string | null;
-  readonly revision: string | null;
 }
 
 export interface UpstreamProbeResult {
@@ -43,32 +42,16 @@ export interface UpstreamProbeResult {
   readonly checkedAt: number;
 }
 
-const FORBIDDEN_FORWARD_HEADERS = new Set([
-  'cookie',
-  'origin',
-  'referer',
-  'host',
-  'authorization',
-  'connection',
-  'keep-alive',
-  'proxy-authorization',
-  'proxy-connection',
-  'te',
-  'trailer',
-  'transfer-encoding',
-  'upgrade',
-  'content-length',
-]);
-
-/** 允许从浏览器转发的请求头白名单（实施文档 5.3）。 */
+/**
+ * 允许从浏览器转发给上游的请求头白名单（实施文档 5.3）。
+ *
+ * 这是唯一的转发白名单：`apps/bff/src/routes/management-proxy.ts` 的
+ * `buildForwardHeaders()` 就是按这 5 项重建请求头的。早期版本这里还有一份
+ * `FORBIDDEN_FORWARD_HEADERS` + `assertForwardableHeader()`，但从来没有调用点——
+ * 白名单式重建本身就是更强的保证（未列出的头根本不会出现在转发请求里），
+ * 名单化的黑名单反而会让人误以为"这里在拦"，故删除。
+ */
 export const FORWARDABLE_HEADERS = new Set(['accept', 'content-type', 'if-match', 'idempotency-key', 'x-request-id']);
-
-export function assertForwardableHeader(name: string): void {
-  const lowered = name.toLowerCase();
-  if (FORBIDDEN_FORWARD_HEADERS.has(lowered) || !FORWARDABLE_HEADERS.has(lowered)) {
-    throw new WebuiError('WEBUI_INVALID_REQUEST', { message: `请求头 ${name} 不允许转发给上游` });
-  }
-}
 
 /**
  * 主动丢弃响应体（拒绝重定向 / 拒绝超大响应）时的统一入口。
@@ -175,7 +158,6 @@ export class UpstreamClient {
       contentType,
       upstreamRequestId: headerOf('x-request-id') ?? headerOf('request-id'),
       retryAfter: headerOf('retry-after'),
-      revision: headerOf('etag') ?? headerOf('x-resource-revision'),
     };
   }
 

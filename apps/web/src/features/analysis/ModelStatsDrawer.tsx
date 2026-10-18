@@ -1,6 +1,6 @@
 import { Drawer, Table } from 'antd';
-import type { ModelStatsData, StatsPeriod } from '../../../../../packages/contracts/generated/upstream-mvp';
-import { encodeSegment } from '@/api/client';
+import type { ModelStatsData, StatsPeriod } from '@parrot-webui/contracts/upstream';
+import { encodePathSegments } from '@/api/client';
 import { useApiQuery } from '@/api/hooks';
 import { AsyncState } from '@/components/state';
 import { MonoText } from '@/components/bits';
@@ -14,7 +14,8 @@ function count(value: number | null | undefined) {
 export function ModelStatsDrawer({ modelId, period, onClose }: { modelId: string | null; period: StatsPeriod; onClose: () => void }) {
   const stats = useApiQuery<ModelStatsData>({
     key: ['stats', 'model', modelId, period],
-    path: `/stats/models/${encodeSegment(modelId ?? '')}`,
+    // 上游该路由是 /stats/models/{modelId:path}，模型 id 允许含斜杠（如 provider/model-a）
+    path: `/stats/models/${encodePathSegments(modelId ?? '')}`,
     query: { period },
     enabled: Boolean(modelId),
   });

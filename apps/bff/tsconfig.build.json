@@ -5,7 +5,9 @@
     "rootDir": "src",
     "types": ["node"],
     "module": "ESNext",
-    "moduleResolution": "Bundler"
+    "moduleResolution": "Bundler",
+    "sourceMap": false,
+    "declarationMap": false
   },
   "include": ["src/**/*.ts"]
 }

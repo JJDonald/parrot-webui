@@ -15,16 +15,30 @@ interface WindowState {
   windowStartedAt: number;
 }
 
-export class SlidingWindowRateLimiter {
+/**
+ * 固定窗口计数器（窗口边界处最多放行 2×limit）。
+ *
+ * 早期版本叫 `SlidingWindowRateLimiter`，但实现一直是固定窗口：窗口起点写死在
+ * `windowStartedAt`，到点整体重置。名字与实现不符会误导运维与后续维护者，
+ * 这里改回本名。真正的滑动窗口需要保存每次请求的时间戳队列，成本更高；
+ * 对"登录/引导接口防暴力猜解"这个用途，固定窗口足够。
+ *
+ * 容器有界策略：`maxKeys` 之外的键按最旧窗口淘汰，但 `pinnedKeys` 里的键
+ * （全局计数用的常量键）永不淘汰——否则攻击者用轮换来源（IPv6 /64）把表刷满，
+ * 就能把全局计数挤掉，等于绕过全局限流。
+ */
+export class FixedWindowRateLimiter {
   private readonly windows = new Map<string, WindowState>();
   private readonly limit: number;
   private readonly windowMs: number;
   private readonly maxKeys: number;
+  private readonly pinnedKeys: ReadonlySet<string>;
 
-  constructor(options: { limit: number; windowMs: number; maxKeys?: number }) {
+  constructor(options: { limit: number; windowMs: number; maxKeys?: number; pinnedKeys?: readonly string[] }) {
     this.limit = options.limit;
     this.windowMs = options.windowMs;
     this.maxKeys = options.maxKeys ?? 4096;
+    this.pinnedKeys = new Set(options.pinnedKeys ?? []);
   }
 
   check(key: string, now = Date.now()): RateLimitVerdict {
@@ -42,14 +56,6 @@ export class SlidingWindowRateLimiter {
     return { allowed: true, remaining: Math.max(0, this.limit - state.count), retryAfterSeconds: 0 };
   }
 
-  /** 请求流程因其他原因失败时回补配额，避免把失败尝试计入用户额度。 */
-  refund(key: string, now = Date.now()): void {
-    const state = this.windows.get(key);
-    if (!state) return;
-    if (now - state.windowStartedAt >= this.windowMs) return;
-    state.count = Math.max(0, state.count - 1);
-  }
-
   reset(): void {
     this.windows.clear();
   }
@@ -59,23 +65,18 @@ export class SlidingWindowRateLimiter {
   }
 
   private sweep(now: number): void {
-    if (this.windows.size < this.maxKeys) {
-      // 常规情况下按窗口过期清理
-      for (const [key, state] of this.windows) {
-        if (now - state.windowStartedAt >= this.windowMs) this.windows.delete(key);
-      }
-      return;
-    }
+    // 常规情况下按窗口过期清理
     for (const [key, state] of this.windows) {
       if (now - state.windowStartedAt >= this.windowMs) this.windows.delete(key);
     }
-    // 仍然超限时按最旧窗口淘汰，保证容器有界
-    if (this.windows.size >= this.maxKeys) {
-      const sorted = [...this.windows.entries()].sort((a, b) => a[1].windowStartedAt - b[1].windowStartedAt);
-      const removeCount = sorted.length - this.maxKeys + 1;
-      for (let index = 0; index < removeCount; index += 1) {
-        this.windows.delete(sorted[index]![0]);
-      }
+    if (this.windows.size < this.maxKeys) return;
+    // 仍然超限时按最旧窗口淘汰，但固定键不参与淘汰，保证全局计数不会被刷掉
+    const removable = [...this.windows.entries()]
+      .filter(([key]) => !this.pinnedKeys.has(key))
+      .sort((a, b) => a[1].windowStartedAt - b[1].windowStartedAt);
+    const removeCount = removable.length - this.maxKeys + this.pinnedKeys.size + 1;
+    for (let index = 0; index < removeCount && index < removable.length; index += 1) {
+      this.windows.delete(removable[index]![0]);
     }
   }
 }

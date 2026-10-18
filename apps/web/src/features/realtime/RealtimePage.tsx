@@ -31,7 +31,7 @@ import type {
   CooldownData,
   RecentCallData,
   RuntimeStatusData,
-} from '../../../../../packages/contracts/generated/upstream-mvp';
+} from '@parrot-webui/contracts/upstream';
 import styles from './RealtimePage.module.scss';
 
 /** 运行视图固定 15 秒刷新。 */

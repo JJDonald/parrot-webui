@@ -272,6 +272,19 @@ export function useAuth(): AuthContextValue {
 }
 
 /**
+ * 上游管理能力（src/management_auth/principal.py）。
+ * 注意全部以 `management.` 开头，所以不能用 /write|manage|admin/ 这类子串匹配——
+ * `management.read` 会命中 "manage"，导致 canWrite 恒为 true、只读分支不可达。
+ */
+const READ_ONLY_CAPABILITIES = new Set(['management.read', 'management.logs.body.read']);
+const WRITE_CAPABILITIES = new Set([
+  'management.write',
+  'management.secrets.write',
+  'management.destructive',
+  'management.update',
+]);
+
+/**
  * 能力判断。
  * 上游 capabilities 的实际结构以真实返回为准；这里只做保守判断：
  * 只有明确拿到能力列表且其中没有任何写能力时才判定为只读，列表缺失一律不限制（由上游再校验）。
@@ -280,8 +293,12 @@ export function useWriteCapability(): { canWrite: boolean; reason: string | null
   const { capabilities, status } = useAuth();
   if (status !== 'authenticated') return { canWrite: false, reason: '未登录' };
   if (!capabilities.length) return { canWrite: true, reason: null };
-  const hasWrite = capabilities.some((capability) => /write|manage|admin/i.test(capability));
-  return hasWrite ? { canWrite: true, reason: null } : { canWrite: false, reason: '当前会话只具备只读能力' };
+  if (capabilities.some((capability) => WRITE_CAPABILITIES.has(capability))) return { canWrite: true, reason: null };
+  // 全部落在已知只读能力集合内才判定只读；出现未知能力时放行，交给上游 403 兜底，
+  // 避免上游新增能力名就把整个管理台锁成只读。
+  const onlyKnownReadOnly = capabilities.every((capability) => READ_ONLY_CAPABILITIES.has(capability));
+  if (onlyKnownReadOnly) return { canWrite: false, reason: '当前会话只具备只读能力（management.read）' };
+  return { canWrite: true, reason: null };
 }
 
 export { initialUpstream };

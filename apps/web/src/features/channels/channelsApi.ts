@@ -107,7 +107,10 @@ export function useChannelCompatibility(channelId: string | null, enabled: boole
 
 export interface CreateChannelInput {
   body: ManualChannelCreateRequest | PresetChannelCreateRequest;
-  /** 合法的 Idempotency-Key（≤200 字符，由 BFF 原样转发），避免创建动作被重复提交两次。 */
+  /**
+   * Idempotency-Key（1–128 字符）。上限取自上游 `src/management_api/dependencies.py`
+   * 对 `idempotency-key` 头的校验；BFF 也按同一区间透传，超出会被任一侧拒绝。
+   */
   idempotencyKey: string;
 }
 

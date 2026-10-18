@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pagination, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import type { StatsBreakdownData, StatsDimension, StatsMetricData, StatsPeriod, StatsSort, StatsSummaryData } from '../../../../../packages/contracts/generated/upstream-mvp';
+import type { StatsBreakdownData, StatsDimension, StatsMetricData, StatsPeriod, StatsSort, StatsSummaryData } from '@parrot-webui/contracts/upstream';
 import { useApiQuery, usePollingInterval } from '@/api/hooks';
 import { AsyncState } from '@/components/state';
 import { MonoText, StatCard } from '@/components/bits';

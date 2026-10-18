@@ -295,7 +295,8 @@ export function AccountModelsSection({ accountId, canWrite }: { accountId: strin
                   setPageSize(nextPageSize);
                   setSelectedKeys([]);
                 },
-                showTotal: (total) => `共 ${total} 个模型`,
+                showTotal:
+                  meta.total === null ? undefined : (total) => `共 ${total} 个模型（服务端计数）`,
               }}
             />
           </div>

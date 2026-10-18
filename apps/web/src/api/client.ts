@@ -91,8 +91,6 @@ export interface RequestOptions {
   ifMatch?: string | undefined;
   idempotencyKey?: string | undefined;
   signal?: AbortSignal;
-  /** 覆盖默认超时（只有上游明确需要同步等待的少数操作才使用）。 */
-  timeoutMs?: number;
   /**
    * 该请求自身的 401 不应触发全局「会话已失效」处理：登录时用错凭据返回的 401
    * 只代表这一次换票失败，不代表已有会话失效（否则登录页会显示误导性的失效提示）。
@@ -134,6 +132,17 @@ export function encodeSegment(value: string): string {
   return encodeURIComponent(value);
 }
 
+/**
+ * 上游 `{param:path}` 转换器参数（目前只有 `/stats/models/{modelId}`）：
+ * 取值本身允许包含斜杠（例如 `provider/model-a`），必须逐段编码后保留分段结构。
+ * 逐段拒绝空段、`.`、`..`，避免借斜杠改变上游路径层级；其余情况退回单段编码。
+ */
+export function encodePathSegments(value: string): string {
+  const parts = value.split('/').filter((part) => part !== '');
+  if (!parts.length || parts.some((part) => part === '.' || part === '..')) return encodeSegment(value);
+  return parts.map((part) => encodeURIComponent(part)).join('/');
+}
+
 export function buildQueryString(query: Record<string, string | number | boolean | undefined | null> = {}): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
@@ -157,11 +166,24 @@ function extractRequestId(payload: unknown, response: Response): string | null {
   return null;
 }
 
+/**
+ * 解析 `Retry-After`。
+ *
+ * RFC 9110 允许两种形式：秒数（`120`）与 HTTP-date（`Wed, 21 Oct 2015 07:28:00 GMT`）。
+ * 只解析秒数会让反代/上游发日期形式时"重试倒计时"消失，退化成普通错误提示。
+ * 返回秒数（向上取整，负值按 0）；无法解析时返回 null，由调用方按无 Retry-After 处理。
+ */
 function parseRetryAfter(response: Response): number | null {
   const raw = response.headers.get('retry-after');
   if (!raw) return null;
-  const seconds = Number(raw);
-  return Number.isFinite(seconds) ? seconds : null;
+  const trimmed = raw.trim();
+  if (/^\d+$/.test(trimmed)) {
+    const seconds = Number(trimmed);
+    return Number.isFinite(seconds) ? seconds : null;
+  }
+  const timestamp = Date.parse(trimmed);
+  if (Number.isNaN(timestamp)) return null;
+  return Math.max(0, Math.ceil((timestamp - Date.now()) / 1000));
 }
 
 async function toApiError(response: Response, rawText: string, suppressSessionLost = false): Promise<ApiError> {

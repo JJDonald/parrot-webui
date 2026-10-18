@@ -13,7 +13,7 @@ import type { AppContext } from '../context.js';
 import { WebuiError } from '../errors.js';
 import { UPSTREAM_CONTRACT_SOURCE } from '@parrot-webui/contracts/routes';
 import { assertCsrf, assertHost, assertJsonContentType, assertOrigin } from '../security/request-guard.js';
-import { resolveClientIp } from '../security/ip.js';
+import { isTrustedAddress, normalizeIp, resolveClientIp } from '../security/ip.js';
 import { proxyRouteCount, frozenRouteTable } from '../security/route-allowlist.js';
 import {
   clearPreloginCookie,
@@ -26,6 +26,7 @@ import {
 import type { UpstreamSessionSummary, WebSession } from './session-store.js';
 import { approximateBodyBytes } from '../util/bytes.js';
 import { sanitizeRequestId } from '../util/crypto.js';
+import { WEBUI_VERSION } from '../version.js';
 
 const LOGIN_BODY_LIMIT_BYTES = 16 * 1024;
 /** 上游 idle 摘要刷新间隔：避免每次请求都打上游，同时不把 stale idle 当永久有效。 */
@@ -51,6 +52,41 @@ export function clientIpOf(request: FastifyRequest, ctx: AppContext): string {
     },
     ctx.config.trustProxy,
   );
+}
+
+/**
+ * 把"这一次请求的来源是怎么判定的"显式暴露给诊断页面。
+ *
+ * WEBUI_TRUST_PROXY 填错的典型表现是完全静默的：直连对端（例如 Docker 网桥网关
+ * 172.x.0.1）不在可信列表里时，X-Forwarded-For 会被整体忽略，所有用户退化成同一个
+ * 限流键。运维只能从"限流不生效"这种间接现象去猜。这里直接给出判定过程。
+ */
+function describeRequestSource(request: FastifyRequest, ctx: AppContext) {
+  const remoteAddress = normalizeIp(request.raw.socket?.remoteAddress ?? 'unknown');
+  const rawForwarded = request.headers['x-forwarded-for'];
+  const forwardedFor = Array.isArray(rawForwarded) ? rawForwarded.join(',') : (rawForwarded ?? null);
+  const remoteTrusted = isTrustedAddress(remoteAddress, ctx.config.trustProxy);
+  const clientIp = resolveClientIp(
+    { remoteAddress: request.raw.socket?.remoteAddress ?? '', forwardedFor: rawForwarded },
+    ctx.config.trustProxy,
+  );
+  return {
+    remoteAddress,
+    forwardedFor,
+    /** 直连对端是否落在 WEBUI_TRUST_PROXY 内；false 表示 XFF 被整体忽略。 */
+    remoteTrusted,
+    /** 最终用于限流与审计的客户端来源。 */
+    clientIp,
+    trustProxy: ctx.config.trustProxy,
+    /**
+     * 常见错配提示（不阻断请求，只在诊断页明示）：
+     * 有 XFF 但直连对端不可信 → 说明 WEBUI_TRUST_PROXY 与真实入口网络不一致。
+     */
+    warning:
+      forwardedFor && !remoteTrusted
+        ? `直连地址 ${remoteAddress} 不在 WEBUI_TRUST_PROXY 内，X-Forwarded-For 被忽略；所有请求会共用 ${remoteAddress} 这一限流键`
+        : null,
+  };
 }
 
 function forwardedRequestId(request: FastifyRequest): string {
@@ -82,33 +118,40 @@ function contractSummary() {
   };
 }
 
-/** 会话摘要：只返回可展示字段，绝不包含 upstreamCredential。 */
-export function sessionPayload(session: WebSession) {
+/**
+ * 会话摘要：只返回可展示字段，绝不包含 upstreamCredential。
+ *
+ * `idleSeconds` 由调用方从 `ctx.config` 显式传入——早期版本用模块级可变变量
+ * `configureSessionPayload()` 注入，同一进程内多次 `buildServer()`（测试、多实例）
+ * 会互相污染，这里改回纯函数。
+ */
+export function sessionPayload(session: WebSession, idleSeconds: number) {
   return {
     summary: session.upstreamSessionSummary as UpstreamSessionSummary,
     localExpiresAt: new Date(session.absoluteExpiresAt).toISOString(),
-    localIdleExpiresAt: new Date(session.lastSeenAt + ctxIdleMs(session)).toISOString(),
+    localIdleExpiresAt: new Date(session.lastSeenAt + idleSeconds * 1000).toISOString(),
     upstreamIdleExpiresAt: session.upstreamIdleExpiresAt ? new Date(session.upstreamIdleExpiresAt).toISOString() : null,
     createdAt: new Date(session.createdAt).toISOString(),
     lastUpstreamRefreshAt: new Date(session.lastUpstreamSessionRefreshAt).toISOString(),
   };
 }
 
-// 由 controller 注入，避免在 payload 里重复计算空闲期
-let idleSecondsForPayload = 1800;
-export function configureSessionPayload(idleSeconds: number): void {
-  idleSecondsForPayload = idleSeconds;
-}
-function ctxIdleMs(_session: WebSession): number {
-  return idleSecondsForPayload * 1000;
-}
-
-/** 取出会话（含 Cookie 清理），未登录抛出 WEBUI_SESSION_REQUIRED。 */
+/**
+ * 取出会话（含 Cookie 清理）。
+ *
+ * 未登录抛 WEBUI_SESSION_REQUIRED；带着会话 Cookie 但会话已不存在/已过期
+ * （空闲超时、绝对超时、登出、容量驱逐）抛 WEBUI_SESSION_EXPIRED。
+ * 两者都是 401，前端 `isSessionLost` 并入同一个转登录流程，区别只在提示文案
+ * 与可观测性：运维能从错误码看出"真有人之前登录过、只是过期了"。
+ */
 export function requireSession(request: FastifyRequest, reply: FastifyReply, ctx: AppContext): WebSession {
   const token = readSessionCookie(request, ctx.config);
   const session = ctx.store.getSession(token);
   if (!session) {
-    if (token) clearSessionCookie(reply, ctx.config);
+    if (token) {
+      clearSessionCookie(reply, ctx.config);
+      throw new WebuiError('WEBUI_SESSION_EXPIRED');
+    }
     throw new WebuiError('WEBUI_SESSION_REQUIRED');
   }
   return session;
@@ -285,7 +328,7 @@ export async function handleLogin(request: FastifyRequest, reply: FastifyReply, 
     const upstreamState = await publicUpstreamState(ctx);
     reply.code(200).send({
       data: {
-        session: sessionPayload(created.session),
+        session: sessionPayload(created.session, ctx.config.sessionIdleSeconds),
         csrfToken: created.session.csrfToken,
         upstream: upstreamState,
       },
@@ -379,7 +422,7 @@ export async function handleSession(request: FastifyRequest, reply: FastifyReply
   reply.code(200).send({
     data: {
       authenticated: true,
-      session: sessionPayload(session),
+      session: sessionPayload(session, ctx.config.sessionIdleSeconds),
       csrfToken: session.csrfToken,
       capabilities,
       upstream,
@@ -400,7 +443,9 @@ export async function handleLogout(request: FastifyRequest, reply: FastifyReply,
   const session = ctx.store.getSession(token);
 
   if (!session) {
-    // 没有本地会话时也保持幂等：清理 Cookie，返回本地已退出
+    // 没有本地会话时也保持幂等：清理 Cookie，返回本地已退出。
+    // 这里不需要 CSRF：请求带不出任何状态变更（Cookie 反正会被清掉），
+    // 而文档声称"无 CSRF 例外"时应该把这个分支写清楚。
     clearSessionCookie(reply, ctx.config);
     clearPreloginCookie(reply, ctx.config);
     reply.code(200).send({
@@ -453,11 +498,12 @@ export async function handleDiagnostics(request: FastifyRequest, reply: FastifyR
   const stats = ctx.store.stats();
   const allowlist = frozenRouteTable();
   const authRoutes = allowlist.filter((route) => route.routeClass === 'auth');
+  const requestSource = describeRequestSource(request, ctx);
 
   reply.code(200).send({
     data: {
       webui: {
-        version: '0.1.0',
+        version: WEBUI_VERSION,
         nodeVersion: process.version,
         startedAt: new Date(ctx.startedAt).toISOString(),
         uptimeSeconds: Math.round((Date.now() - ctx.startedAt) / 1000),
@@ -484,7 +530,9 @@ export async function handleDiagnostics(request: FastifyRequest, reply: FastifyR
           .slice(0, 40)
           .map((route) => ({ method: route.method, path: route.path, note: route.note })),
       },
-      session: sessionPayload(session),
+      session: sessionPayload(session, ctx.config.sessionIdleSeconds),
+      /** 本请求的来源判定结果：用于验证 WEBUI_TRUST_PROXY 是否真的生效。 */
+      requestSource,
       sessions: {
         active: stats.sessions,
         prelogin: stats.prelogins,

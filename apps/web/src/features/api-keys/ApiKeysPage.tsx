@@ -61,7 +61,7 @@ import type {
   ApiKeyStatsData,
   ApiKeyUpdateRequest,
   ApiKeyUsageData,
-} from '../../../../../packages/contracts/generated/upstream-mvp';
+} from '@parrot-webui/contracts/upstream';
 import styles from './ApiKeysPage.module.scss';
 
 type Tri = 'keep' | 'true' | 'false';

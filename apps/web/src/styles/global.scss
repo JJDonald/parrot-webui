@@ -672,6 +672,12 @@ pre,
   color: var(--warning-text);
 }
 
+.notice-box--error {
+  border-color: var(--error-color);
+  background: var(--bg-error-light);
+  color: var(--error-color);
+}
+
 /* ------------------------------------------------------------------ 徽标 */
 
 .pill {
@@ -852,6 +858,60 @@ pre,
 .empty-state__desc {
   margin-top: 4px;
   color: var(--text-secondary);
+}
+
+/* ------------------------------------------------------------------ 渲染错误兜底 */
+
+.error-boundary {
+  display: grid;
+  place-items: center;
+  min-height: 60vh;
+  padding: 24px;
+}
+
+.error-boundary__card {
+  width: min(680px, 100%);
+  padding: 24px;
+  border: 1px solid rgba(198, 87, 70, 0.4);
+  border-radius: var(--radius-lg);
+  background: var(--bg-error-light, var(--bg-secondary));
+}
+
+.error-boundary__title {
+  margin: 0;
+  font-size: 16px;
+  color: var(--error-color);
+}
+
+.error-boundary__text {
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.error-boundary__detail {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  overflow: auto;
+  max-height: 160px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 6px);
+  background: color-mix(in srgb, var(--bg-secondary) 78%, transparent);
+  color: var(--text-primary);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.error-boundary__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.error-boundary__hint {
+  margin: 12px 0 0;
 }
 
 .loading-spinner {

@@ -62,13 +62,23 @@ export function registerStaticRoutes(app: FastifyInstance, ctx: AppContext): boo
     wildcard: true,
     // 关闭插件自带的 Cache-Control 计算，缓存策略完全由 setHeaders 决定
     cacheControl: false,
+    // 构建期已生成 .br/.gz 兄弟文件（scripts/precompress-dist.mjs）：
+    // 由插件按 Accept-Encoding 直接下发，运行时零压缩开销。
+    preCompressed: true,
+    // 绝不对公网托管 sourcemap：返回 false 时插件会走 callNotFound()，
+    // 由下面的 notFoundHandler 按"缺失静态资源"返回 JSON 404。
+    // 这一层是兜底——即使构建流程回归（误开 sourcemap），源码也不会被挂出去。
+    allowedPath(pathname) {
+      return !pathname.endsWith('.map');
+    },
     setHeaders(response, filePath) {
-      if (filePath.endsWith('index.html')) {
+      const source = filePath.replace(/\.(br|gz)$/, '');
+      if (source.endsWith('index.html')) {
         // index.html 必须重新验证，避免前端发版后仍指向旧资源
         response.setHeader('cache-control', 'no-cache, must-revalidate');
         return;
       }
-      if (/[/\\]assets[/\\]/.test(filePath)) {
+      if (/[/\\]assets[/\\]/.test(source)) {
         // 带 hash 的静态资源可以长期缓存
         response.setHeader('cache-control', 'public, max-age=31536000, immutable');
         return;

@@ -14,7 +14,6 @@ import { newRequestId, sanitizeRequestId } from './util/crypto.js';
 import { registerManagementProxy } from './routes/management-proxy.js';
 import { registerHealthRoutes, registerSpaFallback, registerStaticRoutes } from './routes/health.js';
 import {
-  configureSessionPayload,
   handleBootstrap,
   handleDiagnostics,
   handleLogin,
@@ -36,13 +35,19 @@ const CONTENT_SECURITY_POLICY = [
   "object-src 'none'",
 ].join('; ');
 
+/**
+ * login 路由级请求体上限。
+ * 与 controller.ts 内的 LOGIN_BODY_LIMIT_BYTES 保持一致：那边是业务校验（返回 400），
+ * 这里是传输层早拒（返回 413），两者都不能省。
+ */
+const LOGIN_ROUTE_BODY_LIMIT_BYTES = 16 * 1024;
+
 export interface BuildServerOptions {
   context?: AppContext;
 }
 
 export function buildServer(config: WebuiConfig, options: BuildServerOptions = {}): FastifyInstance {
   const ctx = options.context ?? createContext(config);
-  configureSessionPayload(config.sessionIdleSeconds);
 
   const app = Fastify({
     logger: {
@@ -119,6 +124,7 @@ export function buildServer(config: WebuiConfig, options: BuildServerOptions = {
         reply
           .code(413)
           .header(ERROR_SOURCE_HEADER, 'webui')
+          .header('cache-control', 'no-store')
           .send(
             webuiErrorBody(
               new WebuiError('WEBUI_PAYLOAD_TOO_LARGE', { message: '请求体超过 WebUI 允许的上限' }),
@@ -130,13 +136,18 @@ export function buildServer(config: WebuiConfig, options: BuildServerOptions = {
         reply
           .code(415)
           .header(ERROR_SOURCE_HEADER, 'webui')
+          .header('cache-control', 'no-store')
           .send(webuiErrorBody(new WebuiError('WEBUI_UNSUPPORTED_CONTENT_TYPE'), requestId));
         return;
       case 'FST_ERR_CTP_EMPTY_JSON_BODY':
+      // 畸形 JSON（如 `{bad`）在 Fastify 5 里是 FST_ERR_CTP_INVALID_JSON_BODY、状态 400。
+      // 漏掉它会让任何未认证客户端用一行坏 JSON 触发 500 并污染 error 日志。
+      case 'FST_ERR_CTP_INVALID_JSON_BODY':
       case 'FST_ERR_VALIDATION':
         reply
           .code(400)
           .header(ERROR_SOURCE_HEADER, 'webui')
+          .header('cache-control', 'no-store')
           .send(webuiErrorBody(new WebuiError('WEBUI_INVALID_REQUEST', { message: '请求格式不合法' }), requestId));
         return;
       default:
@@ -159,7 +170,12 @@ export function buildServer(config: WebuiConfig, options: BuildServerOptions = {
 
   // 认证与元信息接口（BFF 自有契约）
   app.get('/webui/bff/bootstrap', (request, reply) => handleBootstrap(request, reply, ctx));
-  app.post('/webui/bff/auth/login', (request, reply) => handleLogin(request, reply, ctx));
+  // login 的合法请求体只有 {"managementKey": "..."}，16 KB 绰绰有余。
+  // 必须在路由级设 bodyLimit，否则 5 MiB 的全局上限会先把请求体整个读进内存，
+  // 再由 handler 内的 16 KB 检查拒绝——容器只有 32 MiB tmpfs，属于内存放大点。
+  app.post('/webui/bff/auth/login', { bodyLimit: LOGIN_ROUTE_BODY_LIMIT_BYTES }, (request, reply) =>
+    handleLogin(request, reply, ctx),
+  );
   app.get('/webui/bff/auth/session', (request, reply) => handleSession(request, reply, ctx));
   app.post('/webui/bff/auth/logout', (request, reply) => handleLogout(request, reply, ctx));
   app.get('/webui/bff/diagnostics', (request, reply) => handleDiagnostics(request, reply, ctx));

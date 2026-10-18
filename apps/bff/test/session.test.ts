@@ -190,7 +190,8 @@ describe('BFF 登录 / 会话 / 注销', () => {
 
     const afterLogout = await h.inject({ url: '/webui/bff/management/channels', cookies: [login.sessionCookie] });
     expect(afterLogout.statusCode).toBe(401);
-    expect(codeOf(afterLogout)).toBe('WEBUI_SESSION_REQUIRED');
+    // 带着一个已不存在的会话 Cookie：属于"过期"，不是"没登录过"
+    expect(codeOf(afterLogout)).toBe('WEBUI_SESSION_EXPIRED');
 
     const sessionAfterLogout = await h.inject({ url: '/webui/bff/auth/session', cookies: [login.sessionCookie] });
     expect(sessionAfterLogout.json<{ data: { authenticated: boolean } }>().data.authenticated).toBe(false);
@@ -326,7 +327,8 @@ describe('BFF 登录 / 会话 / 注销', () => {
 
     const afterCleanup = await h.inject({ url: '/webui/bff/management/channels', cookies: [login.sessionCookie] });
     expect(afterCleanup.statusCode).toBe(401);
-    expect(codeOf(afterCleanup)).toBe('WEBUI_SESSION_REQUIRED');
+    // 上游判定失效后本地会话已被销毁，但 Cookie 还在 → 属于"过期"
+    expect(codeOf(afterCleanup)).toBe('WEBUI_SESSION_EXPIRED');
   });
 
   it('上游判定业务请求会话失效（401）时清理本地会话', async () => {

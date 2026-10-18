@@ -32,7 +32,7 @@ import type {
   StatsMetricData,
   StatsPeriod,
   StatsSummaryData,
-} from '../../../../../packages/contracts/generated/upstream-mvp';
+} from '@parrot-webui/contracts/upstream';
 import type { ApiError } from '@/api/client';
 import { useApiQuery, usePollingInterval } from '@/api/hooks';
 import { useWriteCapability } from '@/app/AuthProvider';

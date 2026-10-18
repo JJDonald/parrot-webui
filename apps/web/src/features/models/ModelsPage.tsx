@@ -31,7 +31,7 @@ import type {
   ModelStateRequest,
   ModelStateTargetRequest,
   ModelStatus,
-} from '../../../../../packages/contracts/generated/upstream-mvp';
+} from '@parrot-webui/contracts/upstream';
 import styles from './ModelsPage.module.scss';
 
 const MODEL_KIND_LABEL: Record<ModelKind, string> = { chat: '对话', image: '图像', video: '视频' };

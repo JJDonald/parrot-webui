@@ -42,7 +42,7 @@ import type {
   UpdateOAuthAccountRequest,
   UpdateOAuthSettingsRequest,
   UpdateQuotaMonitorRequest,
-} from '../../../../../packages/contracts/generated/upstream-mvp';
+} from '@parrot-webui/contracts/upstream';
 import type { ApiError } from '@/api/client';
 
 export type {

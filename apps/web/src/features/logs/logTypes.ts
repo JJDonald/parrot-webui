@@ -23,7 +23,7 @@ import type {
   RequestLogSort,
   RequestLogStatus,
   RequestProtocol,
-} from '../../../../../packages/contracts/generated/upstream-mvp';
+} from '@parrot-webui/contracts/upstream';
 
 export type {
   BodySort,

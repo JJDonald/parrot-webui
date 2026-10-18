@@ -409,7 +409,8 @@ describe('BFF 业务代理安全边界', () => {
     const read = await slow.inject({ url: '/webui/bff/management/channels', cookies: [cookie] });
     expect(read.statusCode).toBe(504);
     expect(codeOf(read)).toBe('WEBUI_UPSTREAM_TIMEOUT');
-    expect((read.json() as ErrorEnvelope).error?.message).toContain('写操作结果未知');
+    // 读请求超时：文案不能断言"结果未知"（GET 没有副作用），只说"若为写操作"
+    expect((read.json() as ErrorEnvelope).error?.message).toContain('若为写操作');
 
     const write = await slow.inject({
       method: 'POST',
