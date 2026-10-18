@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 只读仓库；不连接任何真实 Parrot 实例，所有上游都是本地假服务。
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: 契约 / 类型 / 测试 / 构建 / 冒烟
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.5.1
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装依赖（锁定锁文件）
+        run: pnpm install --frozen-lockfile
+
+      - name: 契约快照与允许清单校验（只读）
+        run: pnpm contracts:generate --check
+
+      - name: 生成物零漂移校验
+        run: pnpm contracts:verify
+
+      - name: 前端路径与允许清单一致性
+        run: pnpm check:frontend-paths
+
+      - name: 类型检查
+        run: pnpm typecheck
+
+      - name: 静态检查（XSS 面 / 类型压制 / 存储越界 / 裸日志 / 产物 sourcemap）
+        run: pnpm lint
+
+      - name: 单元与集成测试
+        run: pnpm test
+
+      - name: 构建
+        run: pnpm build
+
+      - name: 构建产物断言（无 sourcemap、预压缩已生成）
+        run: |
+          set -euo pipefail
+          if find apps/web/dist apps/bff/dist -name '*.map' -print -quit | grep -q .; then
+            echo '::error::构建产物中出现 sourcemap'
+            exit 1
+          fi
+          test -f apps/web/dist/index.html.br
+          test -f apps/web/dist/index.html.gz
+
+      - name: 冒烟测试（development 形态）
+        run: pnpm --filter @parrot-webui/e2e test:smoke
+
+      - name: 冒烟测试（production 形态）
+        run: pnpm --filter @parrot-webui/e2e test:smoke:prod
