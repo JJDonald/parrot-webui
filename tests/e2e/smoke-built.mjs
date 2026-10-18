@@ -13,6 +13,7 @@ import { createServer, request as httpRequest } from 'node:http';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import zlib from 'node:zlib';
 const PORT = Number(process.env.PORT ?? 3199);
 
 // 仓库根目录：从本脚本位置向上两级（tests/e2e → 仓库根），不受调用时的工作目录影响
@@ -42,6 +43,37 @@ function call(path, { method = 'GET', headers = {}, body } = {}) {
     if (body) req.write(body);
     req.end();
   });
+}
+
+/** 与 call 相同，但保留原始字节（用于校验预压缩内容）。 */
+function callRaw(path, { method = 'GET', headers = {} } = {}) {
+  return new Promise((resolvePromise, reject) => {
+    const req = httpRequest({ host: '127.0.0.1', port: PORT, path, method, headers }, (res) => {
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => resolvePromise({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+/** 解压预压缩响应并与其 identity 原件逐字节比对。 */
+async function brotliMatchesOriginal(assetPath, compressed, encoding, host) {
+  const original = await callRaw(assetPath, { headers: { host } });
+  if (original.status !== 200) return false;
+  const inflated = await new Promise((resolvePromise, reject) => {
+    const sink = [];
+    const stream =
+      encoding === 'br'
+        ? zlib.createBrotliDecompress()
+        : zlib.createGunzip();
+    stream.on('data', (chunk) => sink.push(chunk));
+    stream.on('error', reject);
+    stream.on('end', () => resolvePromise(Buffer.concat(sink)));
+    stream.end(compressed.body);
+  });
+  return inflated.length === original.body.length && inflated.equals(original.body);
 }
 
 const upstream = createServer((req, res) => {
@@ -138,6 +170,35 @@ try {
       '带 hash 的静态资源长期缓存',
       asset.status === 200 && String(asset.headers['cache-control'] ?? '').includes('immutable'),
       `status=${asset.status} cache=${asset.headers['cache-control']}`,
+    );
+
+    // 源码映射绝不能被托管：构建产物里本来就不该有 .map，托管层还额外拦了一道
+    const mapResponse = await call(`${assetPath}.map`, { headers: { host } });
+    check(
+      '静态资源不托管 sourcemap（.map 必须 404）',
+      mapResponse.status === 404,
+      `status=${mapResponse.status}`,
+    );
+
+    // 预压缩产物存在时，带 Accept-Encoding 的请求必须命中 .br/.gz 而不是回源原件，
+    // 并且解压后必须与 identity 拿到的内容完全一致（防止预压缩脚本产出了错配文件）。
+    const brotli = await callRaw(assetPath, { headers: { host, 'accept-encoding': 'br' } });
+    check(
+      'Brotli 预压缩产物被正确协商且内容可解压还原',
+      brotli.status === 200 &&
+        String(brotli.headers['content-encoding'] ?? '') === 'br' &&
+        brotli.body.length > 0 &&
+        (await brotliMatchesOriginal(assetPath, brotli, 'br', host)),
+      `status=${brotli.status} encoding=${brotli.headers['content-encoding']} bytes=${brotli.body.length}`,
+    );
+    const gzip = await callRaw(assetPath, { headers: { host, 'accept-encoding': 'gzip' } });
+    check(
+      'Gzip 预压缩产物被正确协商且内容可解压还原',
+      gzip.status === 200 &&
+        String(gzip.headers['content-encoding'] ?? '') === 'gzip' &&
+        gzip.body.length > 0 &&
+        (await brotliMatchesOriginal(assetPath, gzip, 'gzip', host)),
+      `status=${gzip.status} encoding=${gzip.headers['content-encoding']} bytes=${gzip.body.length}`,
     );
   } else {
     check('带 hash 的静态资源长期缓存', false, 'index.html 未引用 /webui/assets/*');

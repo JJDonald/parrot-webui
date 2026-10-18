@@ -31,7 +31,8 @@ WORKDIR /app
 
 # ---------------------------------------------------------------- 全部依赖（含构建工具 vite/tsc）
 FROM toolchain AS deps
-# pnpm workspace 的每个 importer 都必须出现在这里，--frozen-lockfile 才能通过
+# 这里只需列出会参与依赖解析的 workspace importer：tests/ 被 .dockerignore 排除，
+# pnpm 的 workspace glob 匹配不到它，因此 --frozen-lockfile 不会要求它的 importer。
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/bff/package.json apps/bff/
 COPY apps/web/package.json apps/web/
@@ -43,6 +44,8 @@ RUN --mount=type=cache,id=parrot-webui-pnpm-store,target=/pnpm/store \
 FROM deps AS build
 COPY tsconfig.base.json ./
 COPY scripts/generate-contracts.mjs scripts/
+COPY scripts/verify-contracts.mjs scripts/
+COPY scripts/precompress-dist.mjs scripts/
 COPY packages/contracts packages/contracts
 COPY apps/bff apps/bff
 COPY apps/web apps/web
@@ -51,13 +54,26 @@ COPY apps/web apps/web
 #    且 mvp-routes.json 的每条 method+path 都真实存在于快照中，失败即中断构建。
 RUN pnpm contracts:generate --check
 
+# 1.1) 生成物漂移校验：把生成物重新生成到临时目录并与仓库里已提交的产物逐字节比对。
+#      --check 只看快照与允许清单，发现不了"改了 mvp-routes.json 却忘了重新生成"。
+RUN pnpm contracts:verify
+
 # 2) contracts（目前为占位 build）→ web（apps/web/dist）→ bff（apps/bff/dist）
 RUN pnpm build
 
-# 3) 产物存在性检查，避免把空 dist 打进运行镜像
+# 3) 产物存在性检查，避免把空 dist 打进运行镜像；
+#    同时确保预压缩产物已生成（BFF 用 preCompressed 直接下发 .br/.gz）。
 RUN test -f apps/web/dist/index.html \
  && test -f apps/bff/dist/index.js \
- && test -d apps/bff/dist
+ && test -d apps/bff/dist \
+ && test -f apps/web/dist/index.html.br \
+ && test -f apps/web/dist/index.html.gz
+
+# 3.1) 交付底线：镜像内绝不能含 sourcemap（完整前端源码 + 完整 BFF 源码）。
+#      构建配置已经关闭 sourcemap，这里再做一次硬检查，防止配置被改回去。
+RUN if find apps/web/dist apps/bff/dist -name '*.map' -print -quit | grep -q .; then \
+      echo 'ERROR: 构建产物中出现 sourcemap，禁止打进运行镜像' >&2; exit 1; \
+    fi
 
 # 4) contracts 已由 pnpm build 产出真实 ES 模块（packages/contracts/dist），
 #    Node 运行时可以直接 import，不再需要任何镜像内的类型剥离或 exports 改写。
@@ -96,6 +112,10 @@ COPY --from=prod-deps --chown=node:node /app/packages/contracts/node_modules ./p
 # 构建产物：BFF 与静态页面
 COPY --from=build --chown=node:node /app/apps/bff/dist ./apps/bff/dist
 COPY --from=build --chown=node:node /app/apps/web/dist ./apps/web/dist
+
+# 诊断接口展示的版本号取自 apps/bff/package.json（src/version.ts 用 ../package.json 定位），
+# 少了这个文件本身不影响运行，只会让 version 退化成 "unknown"。
+COPY --chown=node:node apps/bff/package.json ./apps/bff/package.json
 
 # contracts 包：运行期只用到编译后的冻结路由表与入口，package.json 的 exports 已指向 dist
 COPY --chown=node:node packages/contracts/package.json ./packages/contracts/package.json

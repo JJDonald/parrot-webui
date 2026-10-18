@@ -9,13 +9,14 @@
   "packageManager": "pnpm@12.5.1",
   "scripts": {
     "contracts:generate": "node scripts/generate-contracts.mjs",
+    "contracts:verify": "node scripts/verify-contracts.mjs",
     "contracts:build": "pnpm --filter @parrot-webui/contracts build",
     "check:frontend-paths": "node scripts/check-frontend-paths.mjs",
     "typecheck": "pnpm contracts:build && pnpm -r typecheck",
-    "lint": "pnpm -r lint",
+    "lint": "node scripts/lint.mjs",
     "test": "pnpm contracts:build && pnpm -r test",
     "test:e2e": "pnpm contracts:build && pnpm --filter @parrot-webui/e2e test",
-    "build": "pnpm contracts:build && pnpm --filter @parrot-webui/web build && pnpm --filter @parrot-webui/bff build",
+    "build": "pnpm contracts:build && pnpm --filter @parrot-webui/web build && node scripts/precompress-dist.mjs --dir apps/web/dist && pnpm --filter @parrot-webui/bff build",
     "dev": "pnpm contracts:build && pnpm --parallel --filter @parrot-webui/bff --filter @parrot-webui/web dev",
     "dev:bff": "pnpm contracts:build && pnpm --filter @parrot-webui/bff dev",
     "dev:web": "pnpm contracts:build && pnpm --filter @parrot-webui/web dev",
@@ -24,12 +25,5 @@
   "devDependencies": {
     "openapi-typescript": "^7.9.1",
     "typescript": "^5.9.2"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "@parcel/watcher",
-      "sass-embedded"
-    ]
   }
 }

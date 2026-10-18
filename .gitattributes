@@ -1,0 +1,24 @@
+# 统一换行：仓库内一律存 LF，检出时按平台转换。
+# 没有这个文件时，Windows 上 core.autocrlf=true 会让生成物、脚本与文档的换行形态随机器变化，
+# `git diff` 出现整文件"被修改"的假象，也让 contracts 生成物的一致性难以核对。
+* text=auto eol=lf
+
+# 二进制/无需换行规范化的文件
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.br binary
+*.gz binary
+
+# 必须在任何平台上都保持 LF 的脚本（容器内执行）
+*.sh text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+*.conf text eol=lf
+Caddyfile* text eol=lf

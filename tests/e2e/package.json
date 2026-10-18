@@ -6,8 +6,9 @@
   "scripts": {
     "test": "vitest run",
     "test:smoke": "node smoke-built.mjs",
+    "test:smoke:prod": "node smoke-production.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "node -e \"process.exit(0)\""
+    "lint": "node ../../scripts/lint.mjs --scope e2e"
   },
   "dependencies": {
     "@parrot-webui/contracts": "workspace:*"

@@ -23,7 +23,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "node -e \"process.exit(0)\"",
-    "test": "node -e \"process.exit(0)\""
+    "lint": "node ../../scripts/lint.mjs --scope contracts",
+    "test": "node ../../scripts/verify-contracts.mjs"
   }
 }

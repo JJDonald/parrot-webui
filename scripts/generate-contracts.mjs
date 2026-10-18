@@ -23,14 +23,30 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 const contractsDir = join(root, 'packages', 'contracts');
-const generatedDir = join(contractsDir, 'generated');
+
+const args = process.argv.slice(2);
+const argSet = new Set(args);
+const checkOnly = argSet.has('--check');
+const withFullTypes = argSet.has('--full');
+
+/**
+ * `--out-dir <dir>` 把生成物写到别处（目录不存在会自动创建），用于 `pnpm contracts:verify`：
+ * 生成到临时目录后与仓库内已提交的产物逐字节比对，从而发现"改了 mvp-routes.json 却忘了重新生成"的漂移。
+ * 不给该参数时行为不变（直接写 packages/contracts/generated 与 upstream-meta.json）。
+ */
+const outDirIndex = args.indexOf('--out-dir');
+const outDir = outDirIndex >= 0 ? resolve(args[outDirIndex + 1] ?? '') : null;
+if (outDirIndex >= 0 && !outDir) {
+  console.error('[contracts][错误] --out-dir 需要跟一个目录路径');
+  process.exit(2);
+}
+
+const generatedDir = outDir ?? join(contractsDir, 'generated');
 const snapshotPath = join(contractsDir, 'upstream.openapi.json');
 const metaPath = join(contractsDir, 'upstream-meta.json');
+// --out-dir 模式下 meta 的写入目标也是临时目录，绝不覆盖仓库内的来源记录。
+const metaOutPath = outDir ? join(outDir, 'upstream-meta.json') : metaPath;
 const allowlistPath = join(contractsDir, 'mvp-routes.json');
-
-const args = new Set(process.argv.slice(2));
-const checkOnly = args.has('--check');
-const withFullTypes = args.has('--full');
 
 const problems = [];
 const notes = [];
@@ -117,6 +133,9 @@ for (const excluded of allowlist.excluded?.phase2 ?? []) {
 }
 
 if (checkOnly) {
+  // --check 只校验快照与允许清单，不写任何文件（Dockerfile 构建阶段用的就是这个模式）。
+  // 注意：它**不校验** generated/ 下的产物是否与 mvp-routes.json 同步 —— 那需要重新生成后比对，
+  // 见 docs/contracts.md §3 与 `pnpm contracts:verify`。
   report();
   process.exit(problems.length ? 1 : 0);
 }
@@ -349,7 +368,7 @@ notes.push(`已生成 upstream-mvp.d.ts：${usedNames.length} 个 schema 类型 
 
 meta.allowlistRouteCount = routeSpecs.length;
 if (!checkOnly) {
-  writeFileSync(metaPath, `${JSON.stringify(meta, null, 2)}\n`, 'utf8');
+  writeFileSync(metaOutPath, `${JSON.stringify(meta, null, 2)}\n`, 'utf8');
 }
 
 if (withFullTypes) {
