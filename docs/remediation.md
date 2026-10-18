@@ -46,7 +46,7 @@
 - **→ 已按"删库重建"彻底处置**（原方案是联系 GitHub Support 请求 GC；实测发现仓库当时无 issue / 无 PR / 无 release / 无 star / 无 fork / 无 tag，重建的代价只是丢失这些本就为空的元数据，因此重建更直接）：
   - 重建前先 `git bundle create` 备份干净历史并 `git bundle verify`（"The bundle records a complete history"），再用 `gh repo delete --yes` 删除、`gh repo create --public` 重建、`git push -u origin main` 推回 12 个提交，仓库描述沿用原值。
   - 重建后复验：GitHub API 的 `GET /repos/.../commits/<旧 sha>` 返回 **422 "No commit found for SHA"**、`GET .../contents/<旧文件名>?ref=<旧 sha>` 返回 **404**、其余旧 SHA 的 `raw.githubusercontent.com` 请求均 **404**。→ 后端已不存在旧对象。
-  - 唯一残留是 **CDN 边缘缓存**：某一个旧 SHA 的 raw URL 仍返回 200，但响应头是 `X-Cache: HIT` / `Via: 1.1 varnish` / `Cache-Control: max-age=300`，且同一 SHA 走 API 是 422 —— 说明命中的是已缓存的副本而非现存数据，最多数分钟内自然过期（复核时请优先看 API 的 422/404，而不是 raw 的 200，两者语义不同）。
+  - 唯一残留是 **CDN 边缘缓存**：重建初期某一个旧 SHA 的 raw URL 仍返回 200，但响应头是 `X-Cache: HIT` / `Via: 1.1 varnish` / `Cache-Control: max-age=300`，且同一 SHA 走 API 是 422 —— 说明命中的是已缓存的副本而非现存数据。约 10 分钟后再请求同一 URL 已变为 **404**，边缘缓存自然过期，无残留。
 - **后续补充**：同一文件的宿主机绝对路径（Parrot compose 目录、反代数据目录）与反代 vhost 文件序号也已一并占位化；`22122` 保留，因为它是上游 Parrot 自身 compose 文件里声明的默认端口，不构成站点特有信息。
 
 ### P0-3 契约快照哈希对行尾敏感，在 Linux / CI / Docker 里必然失败
