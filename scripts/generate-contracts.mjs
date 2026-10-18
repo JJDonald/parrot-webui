@@ -59,6 +59,14 @@ function sha256(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
 }
 
+// 快照哈希必须与检出的行尾无关：同一个提交在 Windows（autocrlf）与 Linux 上
+// 得到的字节数不同，而"冻结基线"要跨机器可复算。这里统一按 LF 规范化后再哈希，
+// upstream-meta.json 记录的也是规范化后的值。历史记录值是在 Windows 工作区
+// （CRLF）上算出来的，在 Linux 克隆里必然失败，故一并纠正。
+function normalizeNewlines(buffer) {
+  return buffer.toString('utf8').replace(/\r\n/g, '\n');
+}
+
 // ---------------------------------------------------------------- 1. 快照校验
 
 if (!existsSync(snapshotPath)) {
@@ -73,18 +81,20 @@ if (problems.length) {
 }
 
 const snapshotBuffer = readFileSync(snapshotPath);
+const snapshotText = normalizeNewlines(snapshotBuffer);
 const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
 const allowlist = JSON.parse(readFileSync(allowlistPath, 'utf8'));
 
-const actualHash = sha256(snapshotBuffer);
+const actualHash = sha256(Buffer.from(snapshotText, 'utf8'));
 if (actualHash !== meta.snapshotSha256) {
   fail(
     `快照哈希不一致：文件 ${actualHash} != upstream-meta.json 记录 ${meta.snapshotSha256}。` +
       '若确实要更换基线提交，请重跑快照生成流程并同时更新 upstream-meta.json。',
   );
 }
-if (snapshotBuffer.byteLength !== meta.snapshotBytes) {
-  notes.push(`快照字节数记录为 ${meta.snapshotBytes}，实际 ${snapshotBuffer.byteLength}（哈希一致时以哈希为准）`);
+const actualBytes = Buffer.byteLength(snapshotText, 'utf8');
+if (actualBytes !== meta.snapshotBytes) {
+  notes.push(`快照字节数记录为 ${meta.snapshotBytes}，实际 ${actualBytes}（哈希一致时以哈希为准）`);
 }
 
 const snapshot = JSON.parse(snapshotBuffer.toString('utf8'));

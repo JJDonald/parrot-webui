@@ -13,7 +13,9 @@
 | `pnpm --filter @parrot-webui/e2e test:smoke` | 通过：**18/18** |
 | `pnpm --filter @parrot-webui/e2e test:smoke:prod` | 通过：**31/31**（生产模式，此前无任何自动化覆盖） |
 | `pnpm contracts:verify` | 通过：生成物与允许清单/快照完全同步 |
+| `pnpm contracts:generate --check` | 通过（含 LF 工作树复验，见 P0-3） |
 | `apps/web/dist` + `apps/bff/dist` 的 `*.map` | **0 个** |
+| GitHub Actions `CI` | 第二轮**全绿**（首轮失败并暴露 P0-3，见下方 CI 一节） |
 
 ---
 
@@ -36,6 +38,24 @@
 - **修复**：全部替换为文档保留值 —— 公网 IP → `203.0.113.10`（TEST-NET-3，RFC 5737 专用于文档）、域名 → `parrot.example.com`、内网段 → `172.17.0.0/16` / `10.30.0.0/24`、宿主 hostname → 占位说明。`README.md` 该条目改「海外 VPS」并注明已脱敏。
 - **验证**：全仓 grep 原始 IP / 域名 / 内网段 **零命中**（不在此复述被搜的字符串本身，以免又一次写回）。
 - **⚠ 未完成（需你决策）**：工作区文件已干净，但 **git 历史的三个提交（`41c17f4` / `1ef66c5` / `41f79cb`）里都仍有原始内容**，远端 `origin/main` 也在其中。要真正消除需 `git filter-repo` 重写历史 + 强制推送（并视情况轮换曾在该机器上用过的凭据）。这会改写公开历史，属于不可逆操作，我没有擅自执行。
+- **后续补充**：同一文件的宿主机绝对路径（Parrot compose 目录、反代数据目录）与反代 vhost 文件序号也已一并占位化；`22122` 保留，因为它是上游 Parrot 自身 compose 文件里声明的默认端口，不构成站点特有信息。
+
+### P0-3 契约快照哈希对行尾敏感，在 Linux / CI / Docker 里必然失败
+
+- **发现方式**：本仓库第一次接入 CI（`.github/workflows/ci.yml`）后，`pnpm contracts:generate --check` 在 `ubuntu-latest` 上立即失败：
+  `[contracts][错误] 快照哈希不一致：文件 9465d63198c5afaef2abece16a1d36094201719504c7a394f84c6951ff5acbc1 != upstream-meta.json 记录 ab552e2f3c80f6db368297ef50240b95a34ee3150687d6c3f161280ef870a5e2`
+- **根因**：`scripts/generate-contracts.mjs` 直接对 `readFileSync(snapshotPath)` 的原始字节做 sha256，而 `upstream-meta.json` 记录的 `ab552e2f…` / `2533037` 字节是在 **Windows 工作区（CRLF）** 上算出来的。git 存储与检出的始终是 LF：`git cat-file -s HEAD:packages/contracts/upstream.openapi.json` = **2455548**（差 77489 字节，恰好等于文件内 CRLF 数量）。因此在任何干净克隆（Linux 开发者、CI、`docker build` 里的 `--check`）上，冻结的哈希基线都不成立。
+  - 这个缺陷从首个提交 `41c17f4` 就存在；它此前没被发现，是因为唯一验证过 `--check` 的环境是保留 CRLF 的 Windows 工作区。`.gitattributes` 只是让它变得**在所有平台上都一致地可复现**，不是它失败的原因。
+- **修复**：
+  1. `scripts/generate-contracts.mjs` — 新增 `normalizeNewlines(buffer)`，哈希与字节数都先做 `\r\n → \n` 再计算；注释写明"冻结基线要跨机器可复算，哈希不能依赖检出机器的 autocrlf"。
+  2. `packages/contracts/upstream-meta.json` — `snapshotSha256` 改为 `9465d631…cbc1`、`snapshotBytes` 改为 `2455548`，并新增 `snapshotHashNote` 记录为什么改。
+  3. 重新生成 `packages/contracts/generated/*`（路由表里内嵌的 `UPSTREAM_CONTRACT_SOURCE.snapshotSha256` 同步更新）。
+  4. 文档同步：`docs/contracts.md`、`docs/acceptance.md`、`docs/acceptance-vps-20260922.md`。
+- **验证**：
+  - 本机（CRLF 工作区）`pnpm contracts:generate --check` = 通过；`pnpm contracts:verify` = 通过。
+  - **在 LF 工作树里验证**（`git worktree` + `core.autocrlf=false`，快照 2455548 字节，即 CI 的真实条件）：`node scripts/generate-contracts.mjs --check` = **通过**，`verify-contracts` = 通过，`check:frontend-paths` = 通过（76 模板 / 56 路径）。
+  - CI 第二轮运行通过（见下方"CI"一节）。
+- **附带结论**：`docs/acceptance.md` 早期"在 Linux 上 `--check` 通过"的自述当时无法复现，属于文档失真；现已成立。
 
 ---
 
@@ -85,6 +105,16 @@
 
 ---
 
+## CI
+
+`.github/workflows/ci.yml`（本轮新增，14 步）：checkout → pnpm 12.5.1 → Node 22（缓存 pnpm）→ `pnpm install --frozen-lockfile` → `pnpm contracts:generate --check` → `pnpm contracts:verify` → `pnpm check:frontend-paths` → `pnpm typecheck` → `pnpm lint` → `pnpm test` → `pnpm build` → 产物断言（`*.map` 必须为空、`index.html.br`/`.gz` 必须存在）→ `test:smoke`（18 项）→ `test:smoke:prod`（31 项）。
+
+- 首次运行**失败**，并因此暴露了上面 P0-3 的契约哈希缺陷——这是本次接 CI 最有价值的产出：一个从首个提交起就存在、在 Linux 上必然失败的基线校验错误，此前从未被任何环境验证过。
+- 修复 P0-3 后，第二轮运行全部通过。
+- 运行时已出现一条 GitHub 官方提示：`actions/checkout@v4`、`actions/setup-node@v4`、`pnpm/action-setup@v4` 目标 Node 20 已被弃用（当前由 runner 强制跑在 Node 24 上）。不影响结果，后续升级到 v5 即可。
+
+---
+
 ## 文档口径已对齐
 
 - `README.md`：Node 前置改「Node 22+（engines >=22；Dockerfile 用 24）」，与实际 `engines` 一致；测试数、冒烟数（18/18 + 31/31）、拆包与预压缩现状、`pnpm lint` 不再是占位。
@@ -100,6 +130,6 @@
 ## 仍需你决策 / 无法在本机验证
 
 1. **git 历史脱敏**（P0-2 残留）：是否 `git filter-repo` 重写三个提交并强推 `origin/main`。仓库是公开的，我未擅自改写历史。
-2. **`review/` 目录去留**：评审产物（含内部拓扑分析）目前未跟踪，`.dockerignore` 已排除、不会进镜像。可提交、移出仓库或删除。
+2. **`review/` 目录去留**：评审产物已提交（`review/`，`.dockerignore` 排除、不进镜像）。其中不再含真实基础设施标识；若不想公开保留评审记录，可删除或移到其它仓库。
 3. **Docker 构建与容器运行**：本机 Docker daemon 不可用（`docker info` → `npipe:////./pipe/dockerDesktopLinuxEngine` 连接失败），镜像构建、容器健康检查、`docker compose up` 均未在本机验证。Dockerfile 里新增的 `.map` 断言与 `contracts:verify` 步骤只做了语法与等价命令验证。
 4. **真实 Parrot 实例端到端**：全部测试都用 `node:http` 假上游；真实管理密钥、真实供应商 OAuth、真实反向代理 reload 需现场确认。

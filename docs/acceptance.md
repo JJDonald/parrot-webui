@@ -8,7 +8,7 @@
 | --- | --- |
 | 上游仓库 | https://github.com/danger-dream/Parrot |
 | 基线提交 | `9b73d058635470d59eef7a10876e6532649435d9`（`chore: 发布 v0.33.1`） |
-| 契约快照 | `packages/contracts/upstream.openapi.json`（sha256 `ab552e2f…a5e2`，2 533 037 字节） |
+| 契约快照 | `packages/contracts/upstream.openapi.json`（sha256 `9465d631…cbc1`，2 455 548 字节，均按 LF 规范化计） |
 | 快照来源 | 在隔离检出上执行 `app.openapi()`，**未启动 uvicorn、未连接任何真实 Parrot 实例、未读取用户配置或凭据** |
 | 上游操作数 | 237 个（175 条 path、24 个 router、495 个 schema） |
 | 允许清单 | 76 条路由（73 条业务代理 + 3 条 auth 类），由 `pnpm contracts:generate` 逐条核对存在性 |

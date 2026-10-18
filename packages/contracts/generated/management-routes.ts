@@ -635,7 +635,7 @@ export const UPSTREAM_CONTRACT_SOURCE = {
   "commit": "9b73d058635470d59eef7a10876e6532649435d9",
   "commitSubject": "chore: 发布 v0.33.1",
   "release": "v0.33.1",
-  "snapshotSha256": "ab552e2f3c80f6db368297ef50240b95a34ee3150687d6c3f161280ef870a5e2",
+  "snapshotSha256": "9465d63198c5afaef2abece16a1d36094201719504c7a394f84c6951ff5acbc1",
   "operationCount": 237,
   "pathCount": 175,
   "schemaCount": 495,

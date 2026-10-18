@@ -18,8 +18,10 @@
 
 - 仓库：`https://github.com/danger-dream/Parrot`，分支 `main`
 - 提交：`9b73d058635470d59eef7a10876e6532649435d9`（`chore: 发布 v0.33.1`），发布版本 `v0.33.1`
-- 快照：`upstream.openapi.json`，OpenAPI `3.1.0`，2533037 字节
-- 快照 sha256：`ab552e2f3c80f6db368297ef50240b95a34ee3150687d6c3f161280ef870a5e2`
+- 快照：`upstream.openapi.json`，OpenAPI `3.1.0`，2455548 字节（按 LF 规范化计）
+- 快照 sha256：`9465d63198c5afaef2abece16a1d36094201719504c7a394f84c6951ff5acbc1`（按 LF 规范化计）
+  - 哈希与字节数**先做 LF 规范化再计算**，因此与检出机器的 `core.autocrlf` 无关：Windows 工作区是 CRLF、Linux 与 CI 是 LF，若直接对原始字节哈希，两边必然不同。
+  - 旧记录值 `ab552e2f…a5e2` / `2533037` 是在 Windows 工作区（CRLF）上算的，README 早期的 "Linux 上 `--check` 通过" 结论因此无法在干净克隆中复现；已在本轮修正。
 - 统计：237 个 operation、175 条 path、495 个 schema、24 个 router
 - 允许清单：`mvp-routes.json`，冻结 76 条路由
 - 抽取方式（meta 中 `isolation`）：对固定提交做隔离检出后用 Python 3.14 组合 management router 导出 schema；
