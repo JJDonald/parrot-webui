@@ -411,6 +411,7 @@ docker network disconnect parrot-webui-ingress npm && docker network rm parrot-w
 > 所有命令、输出与结论均保持原样，仅标识符被替换。
 
 > **关于 git 历史**：本文件曾以未脱敏内容进入 git 历史并推送到公开远端。历史已被
-> 重写（所有提交里都不再含原始标识），但 GitHub 是否已回收旧对象不受本项目控制，
+> 重写，且原远端仓库已删除重建，旧提交在 GitHub 后端已不存在（按旧 SHA 查 API 返回
+> 422/404）。但曾公开过的信息应视为已跑光——仍建议按需更换该主机的 IP / 对外域名。
 > 详见 `docs/remediation.md` 的 P0-2 条目。
 

@@ -43,7 +43,10 @@
   - 强推用 `git push --force-with-lease=main:<旧 sha>`，不是裸 `--force`；推送前 `git fsck --unreachable` 与 reflog 均已清空，旧对象在本地已不存在。
   - 清白性用"另一个视角"复验：全新 `git clone` 到临时目录后，对**所有可达 blob** 扫描 12 个原始 token，全部 0 命中；旧 blob SHA 在新克隆里 `cat-file` 报 not a valid object。
   - 远端侧：GitHub API 确认 `main` = 新历史 10 个提交、无 fork / 无 PR / 无 tag / 只有 `main` 一个分支。
-- **⚠ 仍存在、且无法用 push 解决的部分**：GitHub **仍按旧 SHA 直接提供旧提交**。实测重写并强推之后，用旧 commit SHA 打 `GET /repos/JJDonald/parrot-webui/commits/<sha>` 与 `raw.githubusercontent.com/.../<sha>/<旧文件名>` 依然返回 200 与原始内容（GitHub 对已存在的对象保留一段时间，公开仓库可直接按 SHA 访问）。因此"历史已重写"**不等于**"信息已从 GitHub 消失"。彻底清除要联系 GitHub Support 请求 GC 已不可达的对象，或删除仓库重建。处置建议见下方"仍需你决策"。
+- **→ 已按"删库重建"彻底处置**（原方案是联系 GitHub Support 请求 GC；实测发现仓库当时无 issue / 无 PR / 无 release / 无 star / 无 fork / 无 tag，重建的代价只是丢失这些本就为空的元数据，因此重建更直接）：
+  - 重建前先 `git bundle create` 备份干净历史并 `git bundle verify`（"The bundle records a complete history"），再用 `gh repo delete --yes` 删除、`gh repo create --public` 重建、`git push -u origin main` 推回 12 个提交，仓库描述沿用原值。
+  - 重建后复验：GitHub API 的 `GET /repos/.../commits/<旧 sha>` 返回 **422 "No commit found for SHA"**、`GET .../contents/<旧文件名>?ref=<旧 sha>` 返回 **404**、其余旧 SHA 的 `raw.githubusercontent.com` 请求均 **404**。→ 后端已不存在旧对象。
+  - 唯一残留是 **CDN 边缘缓存**：某一个旧 SHA 的 raw URL 仍返回 200，但响应头是 `X-Cache: HIT` / `Via: 1.1 varnish` / `Cache-Control: max-age=300`，且同一 SHA 走 API 是 422 —— 说明命中的是已缓存的副本而非现存数据，最多数分钟内自然过期（复核时请优先看 API 的 422/404，而不是 raw 的 200，两者语义不同）。
 - **后续补充**：同一文件的宿主机绝对路径（Parrot compose 目录、反代数据目录）与反代 vhost 文件序号也已一并占位化；`22122` 保留，因为它是上游 Parrot 自身 compose 文件里声明的默认端口，不构成站点特有信息。
 
 ### P0-3 契约快照哈希对行尾敏感，在 Linux / CI / Docker 里必然失败
@@ -136,7 +139,7 @@
 
 ## 仍需你决策 / 无法在本机验证
 
-1. **git 历史已重写，但 GitHub 仍能按旧 SHA 访问**（P0-2 残留）：本地与远端 `main` 都已是重写后的 10 个提交，新克隆里扫不到任何原始标识；但 GitHub 尚未回收旧对象，`raw.githubusercontent.com` 用旧 SHA 仍能取到原始内容。要真正从平台上消失，需二选一 —— ① 联系 GitHub Support 请求删除已不可达对象（保留仓库、保留 star/issue）；② 删库重建（彻底，但丢失仓库元数据）。**如果你按"信息已泄露"来处置，还应假设该主机与域名已被记录，视需要更换 IP / 域名或加固入口。**
-2. **`review/` 目录去留**：评审产物已提交（`review/`，`.dockerignore` 排除、不进镜像）。其中不再含真实基础设施标识；若不想公开保留评审记录，可删除或移到其它仓库。
+1. **`review/` 目录去留**：评审产物已提交（`review/`，`.dockerignore` 排除、不进镜像）。其中不再含真实基础设施标识；若不想公开保留评审记录，可删除或移到其它仓库。
+2. **曾公开过的基础设施仍应视为已跑光**：仓库已删库重建、旧对象在 GitHub 后端确认不存在（API 422/404），但此前任何一次浏览、fork、镜像或爬虫抓取都不受这次处置影响。若按"已泄露"处置，建议更换该主机的 IP / 对外域名，或至少复核入口暴露面（上游管理端口是否只绑回环、反代是否只放行 `/webui/`）。
 3. **Docker 构建与容器运行**：本机 Docker daemon 不可用（`docker info` → `npipe:////./pipe/dockerDesktopLinuxEngine` 连接失败），镜像构建、容器健康检查、`docker compose up` 均未在本机验证。Dockerfile 里新增的 `.map` 断言与 `contracts:verify` 步骤只做了语法与等价命令验证。
 4. **真实 Parrot 实例端到端**：全部测试都用 `node:http` 假上游；真实管理密钥、真实供应商 OAuth、真实反向代理 reload 需现场确认。
