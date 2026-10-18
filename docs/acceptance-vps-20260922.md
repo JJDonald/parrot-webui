@@ -410,6 +410,7 @@ docker network disconnect parrot-webui-ingress npm && docker network rm parrot-w
 > 自身 compose 文件的默认端口，后者是镜像内部路径，都不构成站点特有信息。
 > 所有命令、输出与结论均保持原样，仅标识符被替换。
 
-> **关于 git 历史**：本文件曾以未脱敏内容进入 git 历史并推送到公开远端。
-> 处置方式与进展见 `docs/remediation.md` 的 P0-2 条目。
+> **关于 git 历史**：本文件曾以未脱敏内容进入 git 历史并推送到公开远端。历史已被
+> 重写（所有提交里都不再含原始标识），但 GitHub 是否已回收旧对象不受本项目控制，
+> 详见 `docs/remediation.md` 的 P0-2 条目。
 

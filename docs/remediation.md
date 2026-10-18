@@ -37,7 +37,13 @@
 - **原状**：`docs/acceptance-vps-20260922.md` 含 25 处真实基础设施标识——真实公网 IP、真实对外域名、真实内网网段、宿主 hostname 与部署路径，且该仓库 `https://github.com/JJDonald/parrot-webui.git` 为公开（`private=false`）。（本文件刻意不复述原始值。）
 - **修复**：全部替换为文档保留值 —— 公网 IP → `203.0.113.10`（TEST-NET-3，RFC 5737 专用于文档）、域名 → `parrot.example.com`、内网段 → `172.17.0.0/16` / `10.30.0.0/24`、宿主 hostname → 占位说明。`README.md` 该条目改「海外 VPS」并注明已脱敏。
 - **验证**：全仓 grep 原始 IP / 域名 / 内网段 **零命中**（不在此复述被搜的字符串本身，以免又一次写回）。
-- **⚠ 未完成（需你决策）**：工作区文件已干净，但 **git 历史的三个提交（`41c17f4` / `1ef66c5` / `41f79cb`）里都仍有原始内容**，远端 `origin/main` 也在其中。要真正消除需 `git filter-repo` 重写历史 + 强制推送（并视情况轮换曾在该机器上用过的凭据）。这会改写公开历史，属于不可逆操作，我没有擅自执行。
+- **git 历史已重写**（`git filter-repo`）：对全部 10 个提交的每一个 blob 做了字面量替换（内容 + 文件路径 + 提交信息），并用 mailmap 把涉及的个人邮箱统一到 `users.noreply.github.com` 地址。
+  - 原文件名里的运营商名本身也是标识，故文件名改为中性的 `docs/acceptance-vps-20260922.md`，全仓引用同步。
+  - **重写后必须先证明"内容没丢"再强推**：从重写前的备份 bundle 解出一份旧仓库，逐提交把旧侧也过一遍同样的替换规则，再与新侧逐文件比对 —— 9 个提交全部 `tree=identical`、提交信息一致，第 10 个（重命名收尾）是重写后新增的。这一步抓到两个我自己的漏项：漏了那条把三个同机服务名一起替换的复合规则时会误以为内容丢了，而复合服务名必须先于其短名替换才符合 filter 的真实行为。
+  - 强推用 `git push --force-with-lease=main:<旧 sha>`，不是裸 `--force`；推送前 `git fsck --unreachable` 与 reflog 均已清空，旧对象在本地已不存在。
+  - 清白性用"另一个视角"复验：全新 `git clone` 到临时目录后，对**所有可达 blob** 扫描 12 个原始 token，全部 0 命中；旧 blob SHA 在新克隆里 `cat-file` 报 not a valid object。
+  - 远端侧：GitHub API 确认 `main` = 新历史 10 个提交、无 fork / 无 PR / 无 tag / 只有 `main` 一个分支。
+- **⚠ 仍存在、且无法用 push 解决的部分**：GitHub **仍按旧 SHA 直接提供旧提交**。实测重写并强推之后，用旧 commit SHA 打 `GET /repos/JJDonald/parrot-webui/commits/<sha>` 与 `raw.githubusercontent.com/.../<sha>/<旧文件名>` 依然返回 200 与原始内容（GitHub 对已存在的对象保留一段时间，公开仓库可直接按 SHA 访问）。因此"历史已重写"**不等于**"信息已从 GitHub 消失"。彻底清除要联系 GitHub Support 请求 GC 已不可达的对象，或删除仓库重建。处置建议见下方"仍需你决策"。
 - **后续补充**：同一文件的宿主机绝对路径（Parrot compose 目录、反代数据目录）与反代 vhost 文件序号也已一并占位化；`22122` 保留，因为它是上游 Parrot 自身 compose 文件里声明的默认端口，不构成站点特有信息。
 
 ### P0-3 契约快照哈希对行尾敏感，在 Linux / CI / Docker 里必然失败
@@ -129,7 +135,7 @@
 
 ## 仍需你决策 / 无法在本机验证
 
-1. **git 历史脱敏**（P0-2 残留）：是否 `git filter-repo` 重写三个提交并强推 `origin/main`。仓库是公开的，我未擅自改写历史。
+1. **git 历史已重写，但 GitHub 仍能按旧 SHA 访问**（P0-2 残留）：本地与远端 `main` 都已是重写后的 10 个提交，新克隆里扫不到任何原始标识；但 GitHub 尚未回收旧对象，`raw.githubusercontent.com` 用旧 SHA 仍能取到原始内容。要真正从平台上消失，需二选一 —— ① 联系 GitHub Support 请求删除已不可达对象（保留仓库、保留 star/issue）；② 删库重建（彻底，但丢失仓库元数据）。**如果你按"信息已泄露"来处置，还应假设该主机与域名已被记录，视需要更换 IP / 域名或加固入口。**
 2. **`review/` 目录去留**：评审产物已提交（`review/`，`.dockerignore` 排除、不进镜像）。其中不再含真实基础设施标识；若不想公开保留评审记录，可删除或移到其它仓库。
 3. **Docker 构建与容器运行**：本机 Docker daemon 不可用（`docker info` → `npipe:////./pipe/dockerDesktopLinuxEngine` 连接失败），镜像构建、容器健康检查、`docker compose up` 均未在本机验证。Dockerfile 里新增的 `.map` 断言与 `contracts:verify` 步骤只做了语法与等价命令验证。
 4. **真实 Parrot 实例端到端**：全部测试都用 `node:http` 假上游；真实管理密钥、真实供应商 OAuth、真实反向代理 reload 需现场确认。
